@@ -1,22 +1,20 @@
-import os
-
-from telethon import TelegramClient
-
-
-def test():
-    with TelegramClient('anon', os.environ.get('API_ID'), os.environ.get(
-            'API_HASH')) as client:  # TODO вынести получение этих переменных в отдельные функции
-        client.loop.run_until_complete(client.send_message('me', 'Pivo'))
+from accounts_parser import AccountsParser
+from settings import ACCOUNT_FILENAME
+from tg_account import TelegramAccount
 
 
 def main():
-    send_reports_to_main_account()
-    send_to_chat_bot('Здарова')
-    wait_chat_bot_to_send('Привет, кидай задачи')
-    for i in []:  # список ников пользователей
-        forward_last_message_from(i)
-        wait_chat_bot_to_send('Норм, ебашь ещё')
-    test()
+    parser = AccountsParser(ACCOUNT_FILENAME)
+    for acc_data in parser.main_accounts:
+        main_acc = TelegramAccount(acc_data)
+        for sub_account_data in parser.sub_accounts_by_main_acc(acc_data):
+            sub_account = TelegramAccount(sub_account_data)
+            sub_account.send_report_to_main_account()
+        sub_accounts_usernames = list(map(
+            lambda sub_account: sub_account['username'],
+            parser.sub_accounts_by_main_acc(acc_data)
+        ))
+        main_acc.send_reports_to_chat_bot(sub_accounts_usernames)
 
 
 if __name__ == '__main__':
