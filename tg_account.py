@@ -2,19 +2,27 @@ import telethon
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 
+import settings
 from settings import API_ID, API_HASH, DIMA_TG_ID, ASYA_TG_ID
 
 
 class TelegramAccount:
-    def __init__(self, parser_row):
+    def __init__(self, parser_row, main_account_id=None):
         self.username = parser_row['username']
         self.is_main = parser_row['is_main'] == 'TRUE'
         self.session = StringSession(parser_row['hash'])
         self.send_to_username = parser_row['send_to']
+        self.image_path = parser_row['image_path']
+        self.link = parser_row['link']
+        self.main_account_id = main_account_id
 
     @property
     def client(self):
         return TelegramClient(self.session, API_ID, API_HASH)
+
+    def get_id(self):
+        with self.client as client:
+            return client.loop.run_until_complete(client.get_me()).id
 
     def send_report_to_main_account(self):
         print(f"Отправляем отчет от {self.username} к {self.send_to_username}.")
@@ -23,11 +31,16 @@ class TelegramAccount:
                 f"Не вышло отправить отчет главному аккаунту: аккаунт `{self.username}` "
                 f"и так главный, либо у него не указано поле `send_to`."
             )
-        # FIXME ну это очевидно надо позже поправить на настоящие отчеты
         with self.client as client:
-            account_id = client.loop.run_until_complete(client.get_me()).id
+            if self.link:
+                client.loop.run_until_complete(
+                    client.send_message(self.main_account_id, str(self.link))
+                )
+            file = open(settings.IMAGES_DIRECTORY_NAME + '/' + self.image_path, 'rb')
             client.loop.run_until_complete(
-                client.send_message(DIMA_TG_ID, f"Тест от {self.username}. ID: {account_id}"))
+                client.send_file(self.main_account_id, file)
+            )
+            file.close()
 
     def send_reports_to_chat_bot(self, sub_accounts_usernames):
         print(f"{self.username} начал отправку отчетов чат боту.")
@@ -41,6 +54,7 @@ class TelegramAccount:
             ))
 
             # FIXME это стоит вынести в отдельный метод какой-то
+            # FIXME в случае со ссылками нам надо 2 последних сообщений отправлять, причем по очереди
             dialogs_with_sub_accounts = list(
                 filter(
                     lambda dialog: isinstance(dialog.entity,
