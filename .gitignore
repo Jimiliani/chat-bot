@@ -4,3 +4,5 @@ venv
 .env.*
 *.session
 accounts.csv
+links.csv
+images
