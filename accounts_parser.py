@@ -67,9 +67,9 @@ class AccountsParser:
         if not self.links_required:
             return None
         try:
-            return links_rows[number - 1]
+            return links_rows[number - 1]['links']
         except IndexError:
-            raise AssertionError(f"Не найдена ссылка в строке {number}")
+            raise AssertionError(f"Не найдена ссылка в строке {number + 1}")
 
     @staticmethod
     def _fix_filename(filename: str):

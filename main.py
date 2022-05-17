@@ -13,6 +13,8 @@ def main():
     for acc_data in parser.main_accounts:
         main_acc = TelegramAccount(acc_data)
         main_acc_id = main_acc.get_id()
+        main_acc.qwe()
+        return
         for sub_account_data in parser.sub_accounts_by_main_acc(acc_data):
             sub_account = TelegramAccount(sub_account_data, main_acc_id)
             sub_account.send_report_to_main_account()
