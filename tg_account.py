@@ -29,12 +29,6 @@ class TelegramAccount:
         with self.client as client:
             return client.loop.run_until_complete(client.get_me()).id
 
-    def qwe(self):
-        with self.client as client:
-            # FIXME удалить
-            print(client.get_dialogs())
-            # client.loop.run_until_complete(client.get_dialogs())[0].message.buttons
-
     @staticmethod
     def get_buttons_from_message(message):
         buttons = [button for buttons_group in message.buttons for button in buttons_group]
