@@ -33,13 +33,13 @@ class AccountsParser:
     def _assemble_account_data(self, accounts_rows, images_paths, links_rows):
         if 0 < len(links_rows) != len(images_paths):
             raise AssertionError(
-                f"Количество ссылок({len(links_rows)}) не совпадает с количеством изображений({len(images_paths)}).\n"
-                f"Обратите внимание на доступные расширения изображений: {settings.ALLOWED_IMAGES_EXTENSIONS}"
+                f'Количество ссылок({len(links_rows)}) не совпадает с количеством изображений({len(images_paths)}).\n'
+                f'Обратите внимание на доступные расширения изображений: {settings.ALLOWED_IMAGES_EXTENSIONS}'
             )
         if len(accounts_rows) != len(images_paths):
             raise AssertionError(
-                f"Количество аккаунтов({len(accounts_rows)}) не совпадает "
-                f"с количеством изображений({len(images_paths)})"
+                f'Количество аккаунтов({len(accounts_rows)}) не совпадает '
+                f'с количеством изображений({len(images_paths)})'
             )
         accounts_data = []
         iteration = 1
@@ -61,7 +61,7 @@ class AccountsParser:
                 )
             )[0]
         except IndexError:
-            raise AssertionError(f"Не найдена картинка с номером {number}")
+            raise AssertionError(f'Не найдена картинка с номером {number}')
 
     def _get_link_with_number(self, links_rows, number) -> Optional[str]:
         if not self.links_required:
@@ -69,7 +69,7 @@ class AccountsParser:
         try:
             return links_rows[number - 1]['links']
         except IndexError:
-            raise AssertionError(f"Не найдена ссылка в строке {number + 1}")
+            raise AssertionError(f'Не найдена ссылка в строке {number + 1}')
 
     @staticmethod
     def _fix_filename(filename: str):
@@ -80,7 +80,7 @@ class AccountsParser:
     @staticmethod
     def _check_existence(path: str):
         if not os.path.exists(path):
-            raise FileNotFoundError(f"Файл/папка {path} не существует")
+            raise FileNotFoundError(f'Файл/папка {path} не существует')
 
     @cached_property
     def main_accounts(self):
