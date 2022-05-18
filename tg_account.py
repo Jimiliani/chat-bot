@@ -91,13 +91,16 @@ class B1TelegramAccount(AbstractTelegramAccount):
             ))
             wait_for_tasks = False
             my_report_sent = False
+            my_report_saved = False
             my_report_image_sent = False
             my_report_link_sent = not self.link
 
             @client.on(events.NewMessage(from_users=[settings.CHAT_BOT_TG_ID]))
             async def handle_message_from_chat_bot(event):
+                # FIXME если акк не заведен в чат боте, то он напишет хуйню какую-то, надо об этом уведомлять
                 bot_message = event.message.message
-                nonlocal wait_for_tasks, my_report_sent, my_report_link_sent, my_report_image_sent
+                nonlocal wait_for_tasks, my_report_sent, my_report_link_sent, my_report_image_sent, my_report_saved
+                # FIXME опять уродство, нужно это как-то поправить
                 if bot_message == 'Привет! Выберите действие из меню!':
                     await client.send_message(settings.CHAT_BOT_TG_ID, 'Активные задачи')
                     wait_for_tasks = True
@@ -126,11 +129,20 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     await client.send_file(settings.CHAT_BOT_TG_ID, file)
                     file.close()
                     return
+                elif not my_report_saved:
+                    my_report_saved = True
+                    self.chat_bot_dialog.get_button_with_text('Сохранить отчет').click()
+                    return
 
                 # FIXME здесь нужно также логировать инфу о том, что отчет чела переслан чат боту
                 try:
+                    # FIXME не будет работать, 4 сообщения за раз нам бот от этого отправит
+                    self.chat_bot_dialog.get_button_with_text('За команду').click()
                     message = next(iterator)
                     await client.forward_messages(settings.CHAT_BOT_TG_ID, message)
+                    if self.link:
+                        await client.forward_messages(settings.CHAT_BOT_TG_ID, message)
+                    self.chat_bot_dialog.get_button_with_text('Сохранить отчет').click()
                 except StopIteration:
                     print(f'{self.username} завершил отправку отчетов чат боту')
                     await client.disconnect()
