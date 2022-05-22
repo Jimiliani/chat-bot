@@ -6,5 +6,6 @@ venv
 .env.*
 *.session
 accounts.csv
+accounts2.csv
 links.csv
 images
