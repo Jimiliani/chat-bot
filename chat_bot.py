@@ -15,7 +15,7 @@ class ChatBotDialog:
                     )
                 )[0]
         except IndexError:
-            print(f'Непредвиденная ошибка: не найден диалог с чат ботом')
+            raise RuntimeError(f'Непредвиденная ошибка: не найден диалог с чат ботом')
 
     async def get_last_message(self):
         return (await self.get_dialog()).message
@@ -34,20 +34,3 @@ class ChatBotDialog:
                 await self.get_buttons_from_last_message()
             )
         )
-
-    async def get_button_with_text(self, text):
-        try:
-            return list(
-                filter(
-                    lambda btn: btn.text == text,
-                    await self.get_buttons_from_last_message()
-                )
-            )[0]
-        except IndexError:
-            raise RuntimeError(f'Непредвиденная ошибка: не найдена кнопка с текстом {text}')
-
-    async def click_button_with_text(self, text):
-        # Полный пиздец вообще, это фиксить надо
-        btn = await self.get_button_with_text(text)
-        async with self.client as client:
-            await btn.click()

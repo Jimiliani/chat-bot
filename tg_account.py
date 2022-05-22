@@ -78,80 +78,61 @@ class B1TelegramAccount(AbstractTelegramAccount):
     async def send_reports_to_chat_bot(self, sub_accounts_usernames):
         print(f'{self.username} начал отправку отчетов чат боту.')
         if not self.is_main:
-            raise ValueError(f'Не вышло отправить отчеты чат боту: аккаунт `{self.username}` не главный.')
+            raise RuntimeError(f'Не вышло отправить отчеты чат боту: аккаунт `{self.username}` не главный.')
         dialog = await self.chat_bot_dialog.get_dialog()
         async with self.client as client:
             iterator = iter(await self._get_messages_to_forward_to_chat_bot(
                 client, sub_accounts_usernames
             ))
-            wait_for_tasks = False
-            my_report_sent = False
-            my_report_saved = False
-            my_report_image_sent = False
-            my_report_link_sent = not self.link
+            should_send_link = bool(self.link)
+            async with client.conversation(dialog) as conv:
+                await conv.send_message('/start')
+                bot_message_text = (await conv.get_response()).text
+                if bot_message_text != 'Привет! Выберите действие из меню!':
+                    raise RuntimeError(
+                        f'Неожиданные ответ от чат бота: "{bot_message_text}". '
+                        f'Ожидалось: "{"Привет! Выберите действие из меню!"}"'
+                    )
 
-            @client.on(events.NewMessage(from_users=[settings.CHAT_BOT_TG_ID]))
-            async def handle_message_from_chat_bot(event):
-                bot_message = event.message.message
-                print(bot_message)
-                nonlocal wait_for_tasks, my_report_sent, my_report_link_sent, my_report_image_sent, my_report_saved
-                # FIXME опять уродство, нужно это как-то поправить
-                if bot_message == 'Привет! Выберите действие из меню!':
-                    await client.send_message(dialog, 'Активные задачи')
-                    wait_for_tasks = True
-                    await client.catch_up()
-                    return
-                elif wait_for_tasks:
-                    buttons_texts = await self.chat_bot_dialog.get_buttons_texts()
-                    if bot_message == 'Нет активных задач':
-                        print(f'Нет активных задач для {self.username}')
-                    print(f'Скопируйте и вставьте задачу из списка:\n{buttons_texts}')
+                await conv.send_message('Активные задачи')
+                bot_message = await conv.get_response()
+                if bot_message.text == 'Нет активных задач':
+                    raise RuntimeError(f'Нет активных задач для {self.username}')
+                buttons_texts = await self.chat_bot_dialog.get_buttons_texts()
+                print(f'Скопируйте и вставьте задачу из списка:\n{buttons_texts}')
+                task_text = str(input())
+                while task_text not in buttons_texts:
+                    print('Нет кнопки с таким текстом, попробуйте снова:\n')
                     task_text = str(input())
-                    while task_text not in buttons_texts:
-                        print('Нет кнопки с таким текстом, попробуйте снова')
-                        task_text = str(input())
-                    wait_for_tasks = False
-                    await self.chat_bot_dialog.click_button_with_text(task_text)
-                    await client.catch_up()
-                    return
-                elif not my_report_sent:
-                    my_report_sent = True
-                    await self.chat_bot_dialog.click_button_with_text('Свой отчет')
-                    await client.catch_up()
-                    return
-                elif not my_report_link_sent:
-                    my_report_link_sent = True
-                    await client.send_message(dialog, str(self.link))
-                    await client.catch_up()
-                    return
-                elif not my_report_image_sent:
-                    my_report_image_sent = True
-                    file = open(settings.IMAGES_DIRECTORY_NAME + '/' + self.image_path, 'rb')
-                    await client.send_file(dialog, file)
-                    await client.catch_up()
-                    file.close()
-                    return
-                elif not my_report_saved:
-                    my_report_saved = True
-                    await self.chat_bot_dialog.click_button_with_text('Сохранить отчет')
-                    await client.catch_up()
-                    return
-                else:
+                await bot_message.click(text=task_text)
+
+                bot_message = await conv.get_response()
+                if should_send_link:
+                    await conv.send_message(str(self.link))
+
+                bot_message = await conv.get_response()
+                with open(settings.IMAGES_DIRECTORY_NAME + '/' + self.image_path, 'rb') as file:
+                    await conv.send_file(file)
+
+                bot_message = await conv.get_response()
+                await bot_message.click(text='Сохранить отчет')
+
+                cycle_len = 3 if should_send_link else 2
+                current_cycle_len = cycle_len
+                while True:
                     # FIXME здесь нужно также логировать инфу о том, что отчет чела переслан чат боту
                     try:
-                        # FIXME не будет работать, 4 сообщения за раз нам бот от этого отправит
-                        await self.chat_bot_dialog.click_button_with_text('За команду')
-                        message = next(iterator)
-                        await client.forward_messages(dialog, message)
-                        if self.link:
-                            await client.forward_messages(dialog, message)
-                        await self.chat_bot_dialog.click_button_with_text('Сохранить отчет')
-                    except (StopIteration, TypeError):  # FIXME TypeError нужен для того, чтобы при отсутствии кнопки 'за команду' сразу завершали отправку
+                        bot_message = await conv.get_response()
+                        if 0 < current_cycle_len < cycle_len:
+                            message = next(iterator)
+                            await client.forward_message(dialog, message)
+                        if current_cycle_len == cycle_len:
+                            await bot_message.click(text='За команду')
+                            current_cycle_len -= 1
+                            continue
+                        else:
+                            current_cycle_len = cycle_len
+                            await bot_message.click(text='Сохранить отчет')
+                    except StopIteration:
                         print(f'{self.username} завершил отправку отчетов чат боту')
-                        await client.disconnect()
-            await client.start()
-            await client.send_message(
-                dialog,
-                '/start'
-            )
-            await client.run_until_disconnected()
+                        conv.cancel()
