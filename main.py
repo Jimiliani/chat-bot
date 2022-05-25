@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+
 from accounts_parser import AccountsParser
 from tg_account import B0TelegramAccount, B1TelegramAccount
 
@@ -6,6 +8,7 @@ import settings
 
 
 async def main():
+    print(datetime.datetime.now())
     parser = AccountsParser(
         settings.ACCOUNTS_FILENAME,
         settings.IMAGES_DIRECTORY_NAME,
@@ -21,7 +24,18 @@ async def main():
             lambda sub_account: sub_account['username'],
             parser.sub_accounts_by_main_acc(acc_data)
         ))
-        await main_acc.send_reports_to_chat_bot(sub_accounts_usernames)
+        try:
+            await main_acc.send_reports_to_chat_bot(sub_accounts_usernames, retries=3)
+        except ValueError:
+            print(
+                f'Не удалось отправить отчет для аккаунта {acc_data["username"]}.\n'
+            )
+            print(f'Изображение: {acc_data["image_path"]}.\n')
+            if acc_data['link']:
+                print(f'Ссылка: {acc_data["link"]}.\n')
+        except asyncio.exceptions.CancelledError:
+            pass
+    print(datetime.datetime.now())
 
 
 if __name__ == '__main__':
