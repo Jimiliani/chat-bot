@@ -15,7 +15,11 @@ CHAT_BOT_TG_ID = 1808403369
 
 CHAT_BOT_MESSAGES_TIMEOUT = 15
 
-PROXY_HOST = 'bproxy.site'
-PROXY_PORT = 10749
-PROXY_LOGIN = os.getenv('PROXY_LOGIN')
-PROXY_PASSWORD = os.getenv('PROXY_PASSWORD')
+PROXY = {
+    'proxy_type': 'socks5',
+    'addr': 'bproxy.site',
+    'port': 10749,
+    'username': os.getenv('PROXY_LOGIN'),
+    'password': os.getenv('PROXY_PASSWORD'),
+    'rdns': True,
+}

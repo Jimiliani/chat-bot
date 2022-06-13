@@ -9,14 +9,6 @@ from chat_bot import ChatBotDialog
 from utils import safe_get_response, click_button_if_any
 
 TASK_NAME = None
-socks.set_default_proxy(
-    socks.SOCKS5,
-    settings.PROXY_HOST,
-    settings.PROXY_PORT,
-    settings.PROXY_LOGIN,
-    settings.PROXY_PASSWORD,
-)
-proxy = socks.get_default_proxy()
 
 
 class AbstractTelegramAccount:
@@ -31,7 +23,7 @@ class AbstractTelegramAccount:
     @property
     def client(self):
         try:
-            return TelegramClient(self.session, settings.API_ID, settings.API_HASH, proxy=proxy)
+            return TelegramClient(self.session, settings.API_ID, settings.API_HASH, proxy=settings.PROXY)
         except Exception as e:
             raise RuntimeError(f'Непредвиденная ошибка при попытке войти в аккаунт {self.username}.')
 
