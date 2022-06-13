@@ -19,7 +19,6 @@ class AbstractTelegramAccount:
         self.send_to_username = parser_row['send_to']
         self.image_path = parser_row['image_path']
         self.link = parser_row['link']
-        self.id = None
 
     @property
     def client(self):
@@ -31,12 +30,7 @@ class AbstractTelegramAccount:
     @property
     async def id(self):
         async with self.client as client:
-            self.id = (await client.get_me()).id
-            return id
-
-    @id.setter
-    async def id(self, value):
-        self._id = value
+            return (await client.get_me()).id
 
 
 class B0TelegramAccount(AbstractTelegramAccount):
@@ -64,9 +58,10 @@ class B0TelegramAccount(AbstractTelegramAccount):
 
 
 class B1TelegramAccount(AbstractTelegramAccount):
-    def __init__(self, parser_row):
+    def __init__(self, parser_row, sub_accounts_usernames):
         super(B1TelegramAccount, self).__init__(parser_row)
         self.chat_bot = ChatBot()
+        self.sub_accounts_usernames = sub_accounts_usernames
 
     async def _get_messages_to_forward_to_chat_bot(self, client, sub_accounts_usernames):
         # FIXME уродство какое-то
@@ -85,14 +80,14 @@ class B1TelegramAccount(AbstractTelegramAccount):
             messages.extend(list(reversed(messages_from_dialog)))
         return messages
 
-    async def send_reports_to_chat_bot(self, sub_accounts_usernames, retries=3):
+    async def send_reports_to_chat_bot(self, retries=3):
         if not self.is_main:
             raise RuntimeError(f'Не вышло отправить отчеты чат боту: аккаунт `{self.username}` не главный.')
 
         while retries > 0:
             retries -= 1
             try:
-                await self._send_reports_to_chat_bot(sub_accounts_usernames)
+                await self._send_reports_to_chat_bot(self.sub_accounts_usernames)
             except Exception as e:
                 print(f'Непредвиденная ошибка: {e}')
         raise ValueError

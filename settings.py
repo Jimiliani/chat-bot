@@ -23,3 +23,6 @@ PROXY = {
     'password': os.getenv('PROXY_PASSWORD'),
     'rdns': True,
 }
+
+
+THREADS_COUNT = 1
