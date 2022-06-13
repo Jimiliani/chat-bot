@@ -16,9 +16,8 @@ async def main():
     )
     for acc_data in parser.main_accounts:
         main_acc = B1TelegramAccount(acc_data)
-        main_acc_id = await main_acc.get_id()
         for sub_account_data in parser.sub_accounts_by_main_acc(acc_data):
-            sub_account = B0TelegramAccount(sub_account_data, main_acc_id)
+            sub_account = B0TelegramAccount(sub_account_data, (await main_acc.id))
             sub_account.send_report_to_main_account()
         sub_accounts_usernames = list(map(
             lambda sub_account: sub_account['username'],

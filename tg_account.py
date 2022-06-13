@@ -5,7 +5,7 @@ from telethon.sessions import StringSession
 from telethon.tl.custom import Conversation
 
 import settings
-from chat_bot import ChatBotDialog
+from chat_bot import ChatBot
 from utils import safe_get_response, click_button_if_any
 
 TASK_NAME = None
@@ -19,6 +19,7 @@ class AbstractTelegramAccount:
         self.send_to_username = parser_row['send_to']
         self.image_path = parser_row['image_path']
         self.link = parser_row['link']
+        self.id = None
 
     @property
     def client(self):
@@ -27,9 +28,15 @@ class AbstractTelegramAccount:
         except Exception as e:
             raise RuntimeError(f'Непредвиденная ошибка при попытке войти в аккаунт {self.username}.')
 
-    async def get_id(self):
+    @property
+    async def id(self):
         async with self.client as client:
-            return (await client.get_me()).id
+            self.id = (await client.get_me()).id
+            return id
+
+    @id.setter
+    async def id(self, value):
+        self._id = value
 
 
 class B0TelegramAccount(AbstractTelegramAccount):
@@ -59,7 +66,7 @@ class B0TelegramAccount(AbstractTelegramAccount):
 class B1TelegramAccount(AbstractTelegramAccount):
     def __init__(self, parser_row):
         super(B1TelegramAccount, self).__init__(parser_row)
-        self.chat_bot_dialog = ChatBotDialog(self.client)
+        self.chat_bot = ChatBot()
 
     async def _get_messages_to_forward_to_chat_bot(self, client, sub_accounts_usernames):
         # FIXME уродство какое-то
@@ -100,14 +107,14 @@ class B1TelegramAccount(AbstractTelegramAccount):
                 f'Ожидалось: \"{"Привет! Выберите действие из меню!"}\"'
             )
 
-    async def _select_task(self, conv: Conversation):
+    async def _select_task(self, conv: Conversation, client):
         global TASK_NAME
         await conv.send_message('Активные задачи')
         bot_message = await safe_get_response(conv)
         if bot_message.text == 'Нет активных задач':
             raise RuntimeError(f'Нет активных задач для {self.username}')
 
-        buttons_texts = await self.chat_bot_dialog.get_buttons_texts()
+        buttons_texts = await self.chat_bot.get_buttons_texts(client)
         if TASK_NAME is None:
             print(f'Скопируйте и вставьте задачу из списка:\n{buttons_texts}')
             task_text = str(input())
@@ -154,16 +161,16 @@ class B1TelegramAccount(AbstractTelegramAccount):
 
     async def _send_reports_to_chat_bot(self, sub_accounts_usernames):
         print(f'{self.username} начал отправку отчетов чат боту.')
-        dialog = await self.chat_bot_dialog.get_dialog()
         should_send_link = bool(self.link)
 
         async with self.client as client:
+            dialog = await self.chat_bot.get_dialog(client)
             messages_to_forward = iter(await self._get_messages_to_forward_to_chat_bot(
                 client, sub_accounts_usernames
             ))
             async with client.conversation(dialog) as conv:
                 await self._start_dialog(conv)
-                await self._select_task(conv)
+                await self._select_task(conv, client)
                 await self._send_my_report(conv)
 
                 conv.cancel()
