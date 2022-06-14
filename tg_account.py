@@ -12,18 +12,19 @@ TASK_NAME = None
 
 
 class AbstractTelegramAccount:
-    def __init__(self, parser_row):
+    def __init__(self, parser_row, proxy):
         self.username = parser_row['username']
         self.is_main = parser_row['is_main'] == 'TRUE'
         self.session = StringSession(parser_row['hash'])
         self.send_to_username = parser_row['send_to']
         self.image_path = parser_row['image_path']
         self.link = parser_row['link']
+        self._proxy = proxy
 
     @property
     def client(self):
         try:
-            return TelegramClient(self.session, settings.API_ID, settings.API_HASH, proxy=settings.PROXY)
+            return TelegramClient(self.session, settings.API_ID, settings.API_HASH, proxy=self._proxy)
         except Exception as e:
             raise RuntimeError(f'Непредвиденная ошибка при попытке войти в аккаунт {self.username}.')
 
@@ -34,8 +35,8 @@ class AbstractTelegramAccount:
 
 
 class B0TelegramAccount(AbstractTelegramAccount):
-    def __init__(self, parser_row, main_account_id=None):
-        super().__init__(parser_row)
+    def __init__(self, parser_row, proxy, main_account_id=None):
+        super().__init__(parser_row, proxy)
         self.main_account_id = main_account_id
 
     def send_report_to_main_account(self):
@@ -58,8 +59,8 @@ class B0TelegramAccount(AbstractTelegramAccount):
 
 
 class B1TelegramAccount(AbstractTelegramAccount):
-    def __init__(self, parser_row, sub_accounts_usernames):
-        super(B1TelegramAccount, self).__init__(parser_row)
+    def __init__(self, parser_row, proxy, sub_accounts_usernames):
+        super(B1TelegramAccount, self).__init__(parser_row, proxy)
         self.chat_bot = ChatBot()
         self.sub_accounts_usernames = sub_accounts_usernames
 
@@ -80,7 +81,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
             messages.extend(list(reversed(messages_from_dialog)))
         return messages
 
-    async def send_reports_to_chat_bot(self, retries=3):
+    async def send_reports_to_chat_bot(self, retries=settings.FULL_DIALOG_RETRIES_COUNT):
         if not self.is_main:
             raise RuntimeError(f'Не вышло отправить отчеты чат боту: аккаунт `{self.username}` не главный.')
 

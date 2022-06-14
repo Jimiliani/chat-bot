@@ -1,11 +1,15 @@
+import random
+
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
 import settings
+import utils
 
 
 def register_account():
-    with TelegramClient(StringSession(), settings.API_ID, settings.API_HASH, proxy=settings.PROXY) as client:
+    proxy = random.choice(utils.get_proxies())
+    with TelegramClient(StringSession(), settings.API_ID, settings.API_HASH, proxy=proxy) as client:
         print(client.session.save())
 
 

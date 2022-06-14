@@ -15,14 +15,22 @@ CHAT_BOT_TG_ID = 1808403369
 
 CHAT_BOT_MESSAGES_TIMEOUT = 15
 
-PROXY = {
-    'proxy_type': 'socks5',
-    'addr': 'bproxy.site',
-    'port': 10749,
-    'username': os.getenv('PROXY_LOGIN'),
-    'password': os.getenv('PROXY_PASSWORD'),
-    'rdns': True,
-}
+PROXY_TYPE = 'socks5'
+PROXY_ADDR_LIST = [
+    '79.143.19.180',
+    '193.42.108.148',
+    '45.135.132.208',
+    '109.172.113.226',
+    '45.139.186.61',
+    '109.172.7.177',
+    '92.62.115.150'
+]
+PROXY_PORT = 45786
+PROXY_USERNAME = os.getenv('PROXY_LOGIN')
+PROXY_PASSWORD = os.getenv('PROXY_PASSWORD')
+PROXY_RDNS = True
 
+PROCESS_COUNT = 1
 
-THREADS_COUNT = 1
+FULL_DIALOG_RETRIES_COUNT = 1
+MESSAGE_RETRIES_COUNT = 1

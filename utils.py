@@ -1,4 +1,5 @@
 import asyncio
+import typing
 
 from telethon.tl.custom import Conversation
 
@@ -12,7 +13,7 @@ class EmptyResponse:
         return None
 
 
-async def safe_get_response(conv: Conversation, retry=3):
+async def safe_get_response(conv: Conversation, retry=settings.MESSAGE_RETRIES_COUNT):
     while retry > 0:
         retry -= 1
         try:
@@ -40,7 +41,7 @@ def send_reports_to_main_account(sub_accounts):
 def send_reports_to_chat_bot(main_accounts):
     for main_acc in main_accounts:
         try:
-            await main_acc.send_reports_to_chat_bot(retries=3)
+            await main_acc.send_reports_to_chat_bot()
         except ValueError:
             print(
                 f'Не удалось отправить отчет для аккаунта {main_acc.username}.\n'
@@ -50,3 +51,16 @@ def send_reports_to_chat_bot(main_accounts):
                 print(f'Ссылка: {main_acc.link}.\n')
         except asyncio.exceptions.CancelledError:
             pass
+
+
+def get_proxies() -> typing.List[dict]:
+    return [
+        {
+            'proxy_type': settings.PROXY_TYPE,
+            'addr': proxy_addr,
+            'port': settings.PROXY_PORT,
+            'username': settings.PROXY_USERNAME,
+            'password': settings.PROXY_PASSWORD,
+            'rdns': settings.PROXY_RDNS,
+        } for proxy_addr in settings.PROXY_ADDR_LIST
+    ]

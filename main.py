@@ -1,7 +1,8 @@
 import asyncio
 import datetime
-import threading
+from multiprocessing import Pool
 
+import utils
 from accounts_parser import AccountsParser
 from tg_account import B0TelegramAccount, B1TelegramAccount
 
@@ -18,34 +19,28 @@ async def main():
     )
     main_accounts = []
     sub_accounts = []
+    proxies = iter(utils.get_proxies())
     for acc_data in parser.main_accounts:
         sub_accounts_usernames = list(map(
             lambda sub_account: sub_account['username'],
             parser.sub_accounts_by_main_acc(acc_data)
         ))
-        main_acc = B1TelegramAccount(acc_data, sub_accounts_usernames)
+        proxy = next(proxies)
+        main_acc = B1TelegramAccount(acc_data, proxy, sub_accounts_usernames)
         main_accounts.append(main_acc)
 
         for sub_account_data in parser.sub_accounts_by_main_acc(acc_data):
-            sub_accounts.append(B0TelegramAccount(sub_account_data, (await main_acc.id)))
+            proxy = next(proxies)
+            sub_accounts.append(B0TelegramAccount(sub_account_data, proxy, (await main_acc.id)))
 
-    chunks_with_sub_accounts = split_by_chunks(sub_accounts, settings.THREADS_COUNT)
-    threads = []
-    for chunk in chunks_with_sub_accounts:
-        t = threading.Thread(target=send_reports_to_main_account, args=[chunk])
-        t.start()
-        threads.append(t)
-    for t in threads:
-        t.join()
+    chunks_with_sub_accounts = split_by_chunks(sub_accounts, settings.PROCESS_COUNT)
+    with Pool(settings.PROCESS_COUNT) as p:
+        print(p.map(send_reports_to_main_account, chunks_with_sub_accounts))
 
-    chunks_with_main_accounts = split_by_chunks(main_accounts, settings.THREADS_COUNT)
-    threads = []
-    for chunk in chunks_with_main_accounts:
-        t = threading.Thread(target=send_reports_to_chat_bot, args=[chunk])
-        t.start()
-        threads.append(t)
-    for t in threads:
-        t.join()
+    chunks_with_main_accounts = split_by_chunks(main_accounts, settings.PROCESS_COUNT)
+    with Pool(settings.PROCESS_COUNT) as p:
+        print(p.map(send_reports_to_chat_bot, chunks_with_main_accounts))
+
     print(datetime.datetime.now())
 
 
