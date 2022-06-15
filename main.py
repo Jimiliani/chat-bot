@@ -26,10 +26,12 @@ async def main():
             parser.sub_accounts_by_main_acc(acc_data)
         ))
         proxy = next(proxies)
+        print(acc_data)
         main_acc = B1TelegramAccount(acc_data, proxy, sub_accounts_usernames)
         main_accounts.append(main_acc)
 
         for sub_account_data in parser.sub_accounts_by_main_acc(acc_data):
+            print(sub_account_data)
             proxy = next(proxies)
             sub_accounts.append(B0TelegramAccount(sub_account_data, proxy, (await main_acc.id)))
 

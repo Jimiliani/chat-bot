@@ -9,7 +9,7 @@ import settings
 class EmptyResponse:
     text = None
 
-    def click(self):
+    def click(self, *args, **kwargs):
         return None
 
 
@@ -17,18 +17,21 @@ async def safe_get_response(conv: Conversation, retry=settings.MESSAGE_RETRIES_C
     while retry > 0:
         retry -= 1
         try:
-            return await conv.get_response(timeout=settings.CHAT_BOT_MESSAGES_TIMEOUT)
-        except asyncio.exceptions.CancelledError:
+            msg = await conv.get_response(timeout=settings.CHAT_BOT_MESSAGES_TIMEOUT)
+            print(msg)
+            return msg
+        except (asyncio.exceptions.CancelledError, asyncio.exceptions.TimeoutError):
             pass
     return EmptyResponse()
 
 
 async def click_button_if_any(msg, text: str) -> bool:
-    return bool(msg.click(text=text))
+    return bool(await msg.click(text=text))
 
 
-async def split_by_chunks(iterable, chunks_count):
+def split_by_chunks(iterable, chunks_count):
     chunk_size = len(iterable) // chunks_count + min(len(iterable) % chunks_count, 1)
+    chunk_size = max(chunk_size, 1)
     for i in range(0, len(iterable), chunk_size):
         yield iterable[i:i + chunk_size]
 
@@ -41,7 +44,7 @@ def send_reports_to_main_account(sub_accounts):
 def send_reports_to_chat_bot(main_accounts):
     for main_acc in main_accounts:
         try:
-            await main_acc.send_reports_to_chat_bot()
+            asyncio.run(main_acc.send_reports_to_chat_bot())
         except ValueError:
             print(
                 f'Не удалось отправить отчет для аккаунта {main_acc.username}.\n'
@@ -63,4 +66,4 @@ def get_proxies() -> typing.List[dict]:
             'password': settings.PROXY_PASSWORD,
             'rdns': settings.PROXY_RDNS,
         } for proxy_addr in settings.PROXY_ADDR_LIST
-    ]
+    ] * settings.ACCOUNTS_ON_PROXY

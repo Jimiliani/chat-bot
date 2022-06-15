@@ -1,4 +1,5 @@
-import socks
+import traceback
+
 import telethon
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -8,7 +9,7 @@ import settings
 from chat_bot import ChatBot
 from utils import safe_get_response, click_button_if_any
 
-TASK_NAME = None
+TASK_NAME = 'Канал "Образуем" Лайки'
 
 
 class AbstractTelegramAccount:
@@ -56,6 +57,7 @@ class B0TelegramAccount(AbstractTelegramAccount):
                 client.send_file(self.main_account_id, file)
             )
             file.close()
+        print(f'Отчет от {self.username} к {self.send_to_username} отправлен успешно.')
 
 
 class B1TelegramAccount(AbstractTelegramAccount):
@@ -91,6 +93,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
                 await self._send_reports_to_chat_bot(self.sub_accounts_usernames)
             except Exception as e:
                 print(f'Непредвиденная ошибка: {e}')
+                print(traceback.format_exc())
         raise ValueError
 
     @staticmethod
@@ -111,14 +114,10 @@ class B1TelegramAccount(AbstractTelegramAccount):
             raise RuntimeError(f'Нет активных задач для {self.username}')
 
         buttons_texts = await self.chat_bot.get_buttons_texts(client)
-        if TASK_NAME is None:
-            print(f'Скопируйте и вставьте задачу из списка:\n{buttons_texts}')
-            task_text = str(input())
-            TASK_NAME = task_text
-            if task_text not in buttons_texts:
-                raise RuntimeError(f'Нет задачи с таким текстом')
-        else:
-            task_text = TASK_NAME
+        try:
+            task_text = list(filter(lambda text: TASK_NAME in text, buttons_texts))[0]
+        except IndexError:
+            raise RuntimeError(f'Нет задачи с текстом {TASK_NAME}.')
         await bot_message.click(text=task_text)
 
     async def _send_my_report(self, conv):
@@ -143,10 +142,12 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     raise RuntimeError('Бот просит ссылку, но у нас её нет')
             elif bot_message.text == 'Перейти к следующему шагу:':
                 await click_button_if_any(bot_message, 'К следующему шагу')
+                await click_button_if_any(bot_message, 'Сохранить отчет')
             else:
                 clicked = await click_button_if_any(bot_message, 'Сохранить отчет')
                 if clicked or bot_message.text == 'Отчет к задаче сохранен':
                     report_saved = True
+                    print(f'Отчет за {self.username} сохранен')
                 else:
                     buttons = bot_message.buttons or []
                     raise RuntimeError(
@@ -169,25 +170,43 @@ class B1TelegramAccount(AbstractTelegramAccount):
                 await self._select_task(conv, client)
                 await self._send_my_report(conv)
 
-                conv.cancel()
-                # TODO переделать отправку отчетов за команду, сейчас она отключена
-                cycle_len = 3 if should_send_link else 2
-                current_cycle_len = cycle_len
-                while True:
-                    # FIXME здесь нужно также логировать инфу о том, что отчет чела переслан чат боту
-                    try:
+                members_left = len(self.sub_accounts_usernames)
+                while members_left > 0:
+                    members_left -= 1
+                    await self._start_dialog(conv)
+                    await self._select_task(conv, client)
+
+                    report_saved = False
+                    should_send_link = bool(self.link)
+
+                    clicked = await click_button_if_any(bot_message, 'За команду')
+                    while not clicked:
                         bot_message = await safe_get_response(conv)
-                        if 0 < current_cycle_len < cycle_len:
+                        clicked = await click_button_if_any(bot_message, 'За команду')
+
+                    while not report_saved:
+                        bot_message = await safe_get_response(conv)
+                        if bot_message.text == 'Отправьте изображение выполненной задачи':
                             message = next(messages_to_forward)
                             await client.forward_message(dialog, message)
-                        if current_cycle_len == cycle_len:
-                            await bot_message.click(text='За команду')
-                            current_cycle_len -= 1
-                            continue
+                        elif bot_message.text == 'Отправьте ссылки':
+                            if should_send_link:
+                                message = next(messages_to_forward)
+                                await client.forward_message(dialog, message)
+                            else:
+                                raise RuntimeError('Бот просит ссылку, но у нас её нет')
+                        elif bot_message.text == 'Перейти к следующему шагу:':
+                            await click_button_if_any(bot_message, 'К следующему шагу')
+                            await click_button_if_any(bot_message, 'Сохранить отчет')
                         else:
-                            conv.cancel()
-                            break
-                    except StopIteration:
-                        print(f'{self.username} завершил отправку отчетов чат боту')
-                        conv.cancel()
-                        break
+                            clicked = await click_button_if_any(bot_message, 'Сохранить отчет')
+                            if clicked or bot_message.text == 'Отчет к задаче сохранен':
+                                report_saved = True
+                                print(f'Отчет за члена команды сохранен')
+                            else:
+                                buttons = bot_message.buttons or []
+                                raise RuntimeError(
+                                    f'Непредвиденный ответ от бота, '
+                                    f'сообщение "{bot_message.text}", '
+                                    f'кнопки: {list(map(lambda btn: btn.text, buttons))}'
+                                )
