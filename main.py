@@ -25,23 +25,20 @@ async def main():
             lambda sub_account: sub_account['username'],
             parser.sub_accounts_by_main_acc(acc_data)
         ))
-        proxy = next(proxies)
-        print(acc_data)
-        main_acc = B1TelegramAccount(acc_data, proxy, sub_accounts_usernames)
-        main_accounts.append(main_acc)
-
         for sub_account_data in parser.sub_accounts_by_main_acc(acc_data):
-            print(sub_account_data)
             proxy = next(proxies)
-            sub_accounts.append(B0TelegramAccount(sub_account_data, proxy, (await main_acc.id)))
+            sub_accounts.append(B0TelegramAccount(sub_account_data, proxy))
+        proxy = next(proxies)
+        main_acc = B1TelegramAccount(acc_data, proxy, sub_accounts)
+        main_accounts.append(main_acc)
 
     chunks_with_sub_accounts = split_by_chunks(sub_accounts, settings.PROCESS_COUNT)
     with Pool(settings.PROCESS_COUNT) as p:
-        print(p.map(send_reports_to_main_account, chunks_with_sub_accounts))
+        p.map(send_reports_to_main_account, chunks_with_sub_accounts)
 
     chunks_with_main_accounts = split_by_chunks(main_accounts, settings.PROCESS_COUNT)
     with Pool(settings.PROCESS_COUNT) as p:
-        print(p.map(send_reports_to_chat_bot, chunks_with_main_accounts))
+        p.map(send_reports_to_chat_bot, chunks_with_main_accounts)
 
     print(datetime.datetime.now())
 

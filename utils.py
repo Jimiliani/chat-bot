@@ -1,9 +1,12 @@
 import asyncio
+import traceback
 import typing
 
 from telethon.tl.custom import Conversation
 
 import settings
+
+# примерно половину этой хуйни можно перетащить в другие файлы и улучшить этим читаемость
 
 
 class EmptyResponse:
@@ -13,12 +16,23 @@ class EmptyResponse:
         return None
 
 
-async def safe_get_response(conv: Conversation, retry=settings.MESSAGE_RETRIES_COUNT):
+async def is_empty(msg):
+    return not getattr(msg, 'text', None) and not getattr(msg, 'buttons', None)
+
+
+async def safe_get_response(conv: Conversation, username, retry=settings.MESSAGE_RETRIES_COUNT):
+    empty_messages_in_a_row = 0
     while retry > 0:
+        if empty_messages_in_a_row == 3:
+            return EmptyResponse()
         retry -= 1
         try:
             msg = await conv.get_response(timeout=settings.CHAT_BOT_MESSAGES_TIMEOUT)
-            print(msg)
+            if is_empty(msg):
+                print(f'[{username}]Предупреждение: получено сообщение от бота без текста и кнопок.')
+                empty_messages_in_a_row += 1
+                retry += 1
+                continue
             return msg
         except (asyncio.exceptions.CancelledError, asyncio.exceptions.TimeoutError):
             pass
@@ -38,7 +52,18 @@ def split_by_chunks(iterable, chunks_count):
 
 def send_reports_to_main_account(sub_accounts):
     for sub_account in sub_accounts:
-        sub_account.send_report_to_main_account()
+        try:
+            asyncio.run(sub_account.send_report_to_main_account())
+        except ValueError:
+            print(
+                f'[{sub_account.username}]Не удалось отправить отчет для аккаунта {sub_account.username}.'
+            )
+            if sub_account.link:
+                print(f'[{sub_account.username}]Ссылка: {sub_account.link}.')
+            print(f'[{sub_account.username}]Изображение: {sub_account.image_path}.\n')
+            print(f'[{sub_account.username}]{traceback.format_exc()}')
+        except asyncio.exceptions.CancelledError:
+            pass
 
 
 def send_reports_to_chat_bot(main_accounts):
@@ -47,11 +72,11 @@ def send_reports_to_chat_bot(main_accounts):
             asyncio.run(main_acc.send_reports_to_chat_bot())
         except ValueError:
             print(
-                f'Не удалось отправить отчет для аккаунта {main_acc.username}.\n'
+                f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.\n'
             )
-            print(f'Изображение: {main_acc.image_path}.\n')
+            print(f'[{main_acc.username}]Изображение: {main_acc.image_path}.\n')
             if main_acc.link:
-                print(f'Ссылка: {main_acc.link}.\n')
+                print(f'[{main_acc.username}]Ссылка: {main_acc.link}.\n')
         except asyncio.exceptions.CancelledError:
             pass
 

@@ -55,12 +55,12 @@ class AccountsParser:
     @staticmethod
     def _get_path_to_image_with_name(images_paths, number) -> str:
         try:
-            return list(
+            return next(
                 filter(
                     lambda path: int(path.split('.')[0]) == number, images_paths
                 )
-            )[0]
-        except IndexError:
+            )
+        except StopIteration:
             raise AssertionError(f'Не найдена картинка с номером {number}')
 
     def _get_link_with_number(self, links_rows, number) -> Optional[str]:
