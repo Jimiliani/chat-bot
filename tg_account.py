@@ -10,8 +10,6 @@ import settings
 from chat_bot import ChatBot
 from utils import safe_get_response, click_button_if_any
 
-TASK_NAME = 'Образуем'
-
 
 class AbstractTelegramAccount:
     def __init__(self, parser_row, proxy):
@@ -92,7 +90,9 @@ class B1TelegramAccount(AbstractTelegramAccount):
 
     async def send_reports_to_chat_bot(self, retries=settings.FULL_DIALOG_RETRIES_COUNT):
         if not self.is_main:
-            raise RuntimeError(f'[{self.username}]Не вышло отправить отчеты чат боту: аккаунт `{self.username}` не главный.')
+            raise RuntimeError(
+                f'[{self.username}]Не вышло отправить отчеты чат боту: аккаунт `{self.username}` не главный.'
+            )
 
         while retries > 0:
             retries -= 1
@@ -114,7 +114,6 @@ class B1TelegramAccount(AbstractTelegramAccount):
             )
 
     async def _select_task(self, conv: Conversation, client):
-        global TASK_NAME
         await conv.send_message('Активные задачи')
         bot_message = await safe_get_response(conv, self.username)
         if bot_message.text == 'Нет активных задач':
@@ -122,9 +121,9 @@ class B1TelegramAccount(AbstractTelegramAccount):
 
         buttons_texts = await self.chat_bot.get_buttons_texts(client, self.username)
         try:
-            task_text = next(filter(lambda text: TASK_NAME in text, buttons_texts.split('\n')))
+            task_text = next(filter(lambda text: settings.TASK_NAME in text, buttons_texts.split('\n')))
         except StopIteration:
-            raise RuntimeError(f'[{self.username}]Нет задачи с текстом {TASK_NAME}.')
+            raise RuntimeError(f'[{self.username}]Нет задачи с текстом {settings.TASK_NAME}.')
         await bot_message.click(text=task_text)
 
     async def _send_my_report(self, conv):

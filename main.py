@@ -11,6 +11,8 @@ from utils import split_by_chunks, send_reports_to_main_account, send_reports_to
 
 
 async def main():
+    print('Введите название задачи(или его часть):')
+    settings.TASK_NAME = str(input())
     print(datetime.datetime.now())
     parser = AccountsParser(
         settings.ACCOUNTS_FILENAME,
@@ -21,25 +23,19 @@ async def main():
     sub_accounts = []
     proxies = iter(utils.get_proxies())
     for acc_data in parser.main_accounts:
-        sub_accounts_usernames = list(map(
-            lambda sub_account: sub_account['username'],
-            parser.sub_accounts_by_main_acc(acc_data)
-        ))
         for sub_account_data in parser.sub_accounts_by_main_acc(acc_data):
-            proxy = next(proxies)
-            sub_accounts.append(B0TelegramAccount(sub_account_data, proxy))
-        proxy = next(proxies)
-        main_acc = B1TelegramAccount(acc_data, proxy, sub_accounts)
-        main_accounts.append(main_acc)
+            sub_accounts.append(B0TelegramAccount(sub_account_data, next(proxies)))
+        main_accounts.append(B1TelegramAccount(acc_data, next(proxies), sub_accounts))
 
+    errors = []
     chunks_with_sub_accounts = split_by_chunks(sub_accounts, settings.PROCESS_COUNT)
     with Pool(settings.PROCESS_COUNT) as p:
-        p.map(send_reports_to_main_account, chunks_with_sub_accounts)
+        errors.extend(p.map(send_reports_to_main_account, chunks_with_sub_accounts))
 
     chunks_with_main_accounts = split_by_chunks(main_accounts, settings.PROCESS_COUNT)
     with Pool(settings.PROCESS_COUNT) as p:
-        p.map(send_reports_to_chat_bot, chunks_with_main_accounts)
-
+        errors.extend(p.map(send_reports_to_chat_bot, chunks_with_main_accounts))
+    print(errors)
     print(datetime.datetime.now())
 
 

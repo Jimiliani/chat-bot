@@ -51,10 +51,11 @@ def split_by_chunks(iterable, chunks_count):
 
 
 def send_reports_to_main_account(sub_accounts):
+    errors =  []
     for sub_account in sub_accounts:
         try:
             asyncio.run(sub_account.send_report_to_main_account())
-        except ValueError:
+        except ValueError as e:
             print(
                 f'[{sub_account.username}]Не удалось отправить отчет для аккаунта {sub_account.username}.'
             )
@@ -62,23 +63,28 @@ def send_reports_to_main_account(sub_accounts):
                 print(f'[{sub_account.username}]Ссылка: {sub_account.link}.')
             print(f'[{sub_account.username}]Изображение: {sub_account.image_path}.\n')
             print(f'[{sub_account.username}]{traceback.format_exc()}')
+            errors.append(str(e))
         except asyncio.exceptions.CancelledError:
             pass
+    return errors
 
 
 def send_reports_to_chat_bot(main_accounts):
+    errors = []
     for main_acc in main_accounts:
         try:
             asyncio.run(main_acc.send_reports_to_chat_bot())
-        except ValueError:
+        except ValueError as e:
             print(
                 f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.\n'
             )
             print(f'[{main_acc.username}]Изображение: {main_acc.image_path}.\n')
             if main_acc.link:
                 print(f'[{main_acc.username}]Ссылка: {main_acc.link}.\n')
+            errors.append(str(e))
         except asyncio.exceptions.CancelledError:
             pass
+    return errors
 
 
 def get_proxies() -> typing.List[dict]:
