@@ -4,6 +4,7 @@ from functools import cached_property
 from typing import Dict, Optional
 
 import settings
+import utils
 
 
 class AccountsParser:
@@ -51,6 +52,12 @@ class AccountsParser:
             })
             iteration += 1
         self.accounts_data = accounts_data
+        if len(self.accounts_data) > len(utils.get_proxies()):
+            raise RuntimeError(
+                f'Количество проксей[{len(settings.PROXY_ADDR_LIST)}] '
+                f'* Количество аккаунтов на 1 прокси[{settings.ACCOUNTS_ON_PROXY}] '
+                f'< Количество аккаунтов[{len(accounts_data)}]'
+            )
 
     @staticmethod
     def _get_path_to_image_with_name(images_paths, number) -> str:

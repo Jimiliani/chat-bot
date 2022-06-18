@@ -1,3 +1,4 @@
+import time
 import traceback
 
 import telethon
@@ -8,7 +9,7 @@ from typing import List
 
 import settings
 from chat_bot import ChatBot
-from utils import safe_get_response, click_button_if_any
+from utils import safe_get_response, click_button_if_any, get_time_to_sleep
 
 
 class AbstractTelegramAccount:
@@ -46,6 +47,7 @@ class B0TelegramAccount(AbstractTelegramAccount):
         async with self.client as client:
             entity = await client.get_entity(self.send_to_username)
             if self.link:
+                time.sleep(get_time_to_sleep())
                 await client.send_message(entity, str(self.link))
             with open(settings.IMAGES_DIRECTORY_NAME + '/' + self.image_path, 'rb') as file:
                 await client.send_file(entity, file)
@@ -115,6 +117,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
             )
 
     async def _select_task(self, conv: Conversation, client):
+        time.sleep(get_time_to_sleep())
         await conv.send_message('Активные задачи')
         bot_message = await safe_get_response(conv, self.username)
         if bot_message.text == 'Нет активных задач':
@@ -144,6 +147,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     await conv.send_file(file)
             elif bot_message.text == 'Отправьте ссылки':
                 if should_send_link:
+                    time.sleep(get_time_to_sleep())
                     await conv.send_message(str(self.link))
                 else:
                     raise RuntimeError(f'[{self.username}]Бот просит ссылку, но у нас её нет')
@@ -194,10 +198,12 @@ class B1TelegramAccount(AbstractTelegramAccount):
                         bot_message = await safe_get_response(conv, self.username)
                         if bot_message.text == 'Отправьте изображение выполненной задачи':
                             message = next(messages_to_forward)
+                            time.sleep(get_time_to_sleep())
                             await client.forward_messages(dialog, message)
                         elif bot_message.text == 'Отправьте ссылки':
                             if should_send_link:
                                 message = next(messages_to_forward)
+                                time.sleep(get_time_to_sleep())
                                 await client.forward_messages(dialog, message)
                             else:
                                 raise RuntimeError(f'[{self.username}]Бот просит ссылку, но у нас её нет')

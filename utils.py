@@ -1,4 +1,5 @@
 import asyncio
+import random
 import traceback
 import typing
 
@@ -98,3 +99,7 @@ def get_proxies() -> typing.List[dict]:
             'rdns': settings.PROXY_RDNS,
         } for proxy_addr in settings.PROXY_ADDR_LIST
     ] * settings.ACCOUNTS_ON_PROXY
+
+
+def get_time_to_sleep():
+    return round(random.uniform(1, 3), 2)
