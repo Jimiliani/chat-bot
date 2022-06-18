@@ -28,7 +28,7 @@ async def safe_get_response(conv: Conversation, username, retry=settings.MESSAGE
         retry -= 1
         try:
             msg = await conv.get_response(timeout=settings.CHAT_BOT_MESSAGES_TIMEOUT)
-            if is_empty(msg):
+            if await is_empty(msg):
                 print(f'[{username}]Предупреждение: получено сообщение от бота без текста и кнопок.')
                 empty_messages_in_a_row += 1
                 retry += 1
@@ -76,9 +76,9 @@ def send_reports_to_chat_bot(main_accounts):
             asyncio.run(main_acc.send_reports_to_chat_bot())
         except ValueError as e:
             print(
-                f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.\n'
+                f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.'
             )
-            print(f'[{main_acc.username}]Изображение: {main_acc.image_path}.\n')
+            print(f'[{main_acc.username}]Изображение: {main_acc.image_path}.')
             if main_acc.link:
                 print(f'[{main_acc.username}]Ссылка: {main_acc.link}.\n')
             errors.append(str(e))

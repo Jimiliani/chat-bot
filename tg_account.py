@@ -93,16 +93,17 @@ class B1TelegramAccount(AbstractTelegramAccount):
             raise RuntimeError(
                 f'[{self.username}]Не вышло отправить отчеты чат боту: аккаунт `{self.username}` не главный.'
             )
-
+        error = ''
         while retries > 0:
             retries -= 1
             try:
                 await self._send_reports_to_chat_bot(self.completed_sub_accounts_usernames)
                 return
             except Exception as e:
-                print(f'[{self.username}]Непредвиденная ошибка: {e}')
+                error = f'[{self.username}]Непредвиденная ошибка: {e}'
+                print(error)
                 print(f'[{self.username}]{traceback.format_exc()}')
-        raise ValueError
+        raise ValueError(error)
 
     async def _start_dialog(self, conv: Conversation):
         await conv.send_message('/start')

@@ -27,15 +27,16 @@ async def main():
             sub_accounts.append(B0TelegramAccount(sub_account_data, next(proxies)))
         main_accounts.append(B1TelegramAccount(acc_data, next(proxies), sub_accounts))
 
-    errors = []
+    errors_lists = []
     chunks_with_sub_accounts = split_by_chunks(sub_accounts, settings.PROCESS_COUNT)
     with Pool(settings.PROCESS_COUNT) as p:
-        errors.extend(p.map(send_reports_to_main_account, chunks_with_sub_accounts))
+        errors_lists.extend(p.map(send_reports_to_main_account, chunks_with_sub_accounts))
 
     chunks_with_main_accounts = split_by_chunks(main_accounts, settings.PROCESS_COUNT)
     with Pool(settings.PROCESS_COUNT) as p:
-        errors.extend(p.map(send_reports_to_chat_bot, chunks_with_main_accounts))
-    print(errors)
+        errors_lists.extend(p.map(send_reports_to_chat_bot, chunks_with_main_accounts))
+    for error in [error for errors_list in errors_lists for error in errors_list]:
+        print(error)
     print(datetime.datetime.now())
 
 
