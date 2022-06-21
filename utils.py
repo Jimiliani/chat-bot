@@ -5,7 +5,9 @@ import typing
 
 from telethon.tl.custom import Conversation
 
+import mobile_proxy
 import settings
+
 
 # примерно половину этой хуйни можно перетащить в другие файлы и улучшить этим читаемость
 
@@ -52,22 +54,28 @@ def split_by_chunks(iterable, chunks_count):
 
 
 def send_reports_to_main_account(sub_accounts):
-    errors =  []
+    result = []
     for sub_account in sub_accounts:
         try:
-            asyncio.run(sub_account.send_report_to_main_account())
-        except ValueError as e:
+            result.append(asyncio.run(sub_account.send_report_to_main_account()))
+        except Exception as e:
+            print(f'[{sub_account.username}]Не удалось отправить отчет для аккаунта {sub_account.username}.')
             print(
-                f'[{sub_account.username}]Не удалось отправить отчет для аккаунта {sub_account.username}.'
+                f'[{sub_account.username}]\n'
+                f'username: {sub_account.username}\n'
+                f'is_main: {sub_account.is_main}\n'
+                f'session: {sub_account.session}\n'
+                f'send_to_username: {sub_account.send_to_username}\n'
+                f'image_path: {sub_account.image_path}\n'
+                f'link: {sub_account.link}\n'
+                f'proxy: {sub_account._proxy.as_dict()}\n'
+                f'completed: {sub_account.completed}'
             )
-            if sub_account.link:
-                print(f'[{sub_account.username}]Ссылка: {sub_account.link}.')
-            print(f'[{sub_account.username}]Изображение: {sub_account.image_path}.\n')
             print(f'[{sub_account.username}]{traceback.format_exc()}')
-            errors.append(str(e))
+            result.append(str(e))
         except asyncio.exceptions.CancelledError:
             pass
-    return errors
+    return result
 
 
 def send_reports_to_chat_bot(main_accounts):
@@ -75,30 +83,39 @@ def send_reports_to_chat_bot(main_accounts):
     for main_acc in main_accounts:
         try:
             asyncio.run(main_acc.send_reports_to_chat_bot())
-        except ValueError as e:
+        except Exception as e:
+            print(f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.')
             print(
-                f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.'
+                f'[{main_acc.username}]\n'
+                f'username: {main_acc.username}\n'
+                f'is_main: {main_acc.is_main}\n'
+                f'session: {main_acc.session}\n'
+                f'send_to_username: {main_acc.send_to_username}\n'
+                f'image_path: {main_acc.image_path}\n'
+                f'link: {main_acc.link}\n'
+                f'proxy: {main_acc._proxy.as_dict()}\n'
+                f'completed: {main_acc.completed}'
             )
-            print(f'[{main_acc.username}]Изображение: {main_acc.image_path}.')
-            if main_acc.link:
-                print(f'[{main_acc.username}]Ссылка: {main_acc.link}.\n')
+            print(f'[{main_acc.username}]{traceback.format_exc()}')
             errors.append(str(e))
         except asyncio.exceptions.CancelledError:
             pass
     return errors
 
 
-def get_proxies() -> typing.List[dict]:
+def get_proxies() -> typing.List[mobile_proxy.MobileProxy]:
     return [
-        {
-            'proxy_type': settings.PROXY_TYPE,
-            'addr': proxy_addr,
-            'port': settings.PROXY_PORT,
-            'username': settings.PROXY_USERNAME,
-            'password': settings.PROXY_PASSWORD,
-            'rdns': settings.PROXY_RDNS,
-        } for proxy_addr in settings.PROXY_ADDR_LIST
-    ] * settings.ACCOUNTS_ON_PROXY
+               mobile_proxy.MobileProxy(
+                   id_,
+                   host,
+                   port,
+                   login,
+                   password,
+                   key,
+                   token
+               )
+               for id_, host, port, login, password, key, token in settings.MOBILE_PROXIES
+           ]
 
 
 def get_time_to_sleep():

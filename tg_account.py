@@ -7,13 +7,14 @@ from telethon.sessions import StringSession
 from telethon.tl.custom import Conversation
 from typing import List
 
+import mobile_proxy
 import settings
 from chat_bot import ChatBot
 from utils import safe_get_response, click_button_if_any, get_time_to_sleep
 
 
 class AbstractTelegramAccount:
-    def __init__(self, parser_row, proxy):
+    def __init__(self, parser_row, proxy: mobile_proxy.MobileProxy):
         self.username = parser_row['username']
         self.is_main = parser_row['is_main'] == 'TRUE'
         self.session = StringSession(parser_row['hash'])
@@ -25,15 +26,9 @@ class AbstractTelegramAccount:
 
     @property
     def client(self):
-        try:
-            return TelegramClient(self.session, settings.API_ID, settings.API_HASH, proxy=self._proxy)
-        except Exception as e:
-            raise RuntimeError(f'[{self.username}]Непредвиденная ошибка при попытке войти в аккаунт {self.username}.')
-
-    @property
-    async def id(self):
-        async with self.client as client:
-            return (await client.get_me()).id
+        x = self._proxy.as_dict()
+        print(x)
+        return TelegramClient(self.session, settings.API_ID, settings.API_HASH, proxy=x)
 
 
 class B0TelegramAccount(AbstractTelegramAccount):
@@ -53,6 +48,7 @@ class B0TelegramAccount(AbstractTelegramAccount):
                 await client.send_file(entity, file)
         self.completed = True
         print(f'[{self.username}]Отчет от {self.username} к {self.send_to_username} отправлен успешно.')
+        return self
 
 
 class B1TelegramAccount(AbstractTelegramAccount):
@@ -186,6 +182,9 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     members_left -= 1
                     await self._start_dialog(conv)
                     await self._select_task(conv, client)
+                    if should_send_link:
+                        link = next(messages_to_forward)
+                    image = next(messages_to_forward)
 
                     report_saved = False
                     bot_message = await safe_get_response(conv, self.username)
@@ -197,14 +196,12 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     while not report_saved:
                         bot_message = await safe_get_response(conv, self.username)
                         if bot_message.text == 'Отправьте изображение выполненной задачи':
-                            message = next(messages_to_forward)
                             time.sleep(get_time_to_sleep())
-                            await client.forward_messages(dialog, message)
+                            await client.forward_messages(dialog, image)
                         elif bot_message.text == 'Отправьте ссылки':
                             if should_send_link:
-                                message = next(messages_to_forward)
                                 time.sleep(get_time_to_sleep())
-                                await client.forward_messages(dialog, message)
+                                await client.forward_messages(dialog, link)
                             else:
                                 raise RuntimeError(f'[{self.username}]Бот просит ссылку, но у нас её нет')
                         elif bot_message.text == 'Перейти к следующему шагу:':

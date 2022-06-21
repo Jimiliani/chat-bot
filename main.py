@@ -21,20 +21,37 @@ async def main():
     )
     main_accounts = []
     sub_accounts = []
-    proxies = iter(utils.get_proxies())
+    counter = 0
+    proxies = utils.get_proxies()
     for acc_data in parser.main_accounts:
+        counter += 1
+        print(acc_data)
+        current_acc_sub_accounts = []
         for sub_account_data in parser.sub_accounts_by_main_acc(acc_data):
-            sub_accounts.append(B0TelegramAccount(sub_account_data, next(proxies)))
-        main_accounts.append(B1TelegramAccount(acc_data, next(proxies), sub_accounts))
+            counter += 1
+            print(sub_account_data)
+            sub_account = B0TelegramAccount(sub_account_data, proxies[counter % len(proxies)])
+            current_acc_sub_accounts.append(sub_account)
+            sub_accounts.append(sub_account)
+        main_accounts.append(B1TelegramAccount(acc_data, proxies[counter % len(proxies)], current_acc_sub_accounts))
 
-    errors_lists = []
-    chunks_with_sub_accounts = split_by_chunks(sub_accounts, settings.PROCESS_COUNT)
+    result = []
+    errors = []
+    chunks_with_sub_accounts = list(split_by_chunks(sub_accounts, settings.PROCESS_COUNT))
     with Pool(settings.PROCESS_COUNT) as p:
-        errors_lists.extend(p.map(send_reports_to_main_account, chunks_with_sub_accounts))
+        result.extend(p.map(send_reports_to_main_account, chunks_with_sub_accounts))
+    for orig_list, new_list in zip(chunks_with_sub_accounts, result):
+        for orig, new in zip(orig_list, new_list):
+            if getattr(new, 'completed', False):
+                orig.completed = True
+            else:
+                errors.append(new)
 
+    errors_lists = [errors]
     chunks_with_main_accounts = split_by_chunks(main_accounts, settings.PROCESS_COUNT)
     with Pool(settings.PROCESS_COUNT) as p:
         errors_lists.extend(p.map(send_reports_to_chat_bot, chunks_with_main_accounts))
+
     for error in [error for errors_list in errors_lists for error in errors_list]:
         print(error)
     print(datetime.datetime.now())

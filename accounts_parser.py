@@ -52,7 +52,7 @@ class AccountsParser:
             })
             iteration += 1
         self.accounts_data = accounts_data
-        if len(self.accounts_data) > len(utils.get_proxies()):
+        if len(self.accounts_data) > len(utils.get_proxies()) * settings.ACCOUNTS_ON_PROXY:
             raise RuntimeError(
                 f'Количество проксей[{len(settings.PROXY_ADDR_LIST)}] '
                 f'* Количество аккаунтов на 1 прокси[{settings.ACCOUNTS_ON_PROXY}] '

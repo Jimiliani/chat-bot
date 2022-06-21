@@ -9,7 +9,7 @@ import utils
 
 def register_account():
     proxy = random.choice(utils.get_proxies())
-    with TelegramClient(StringSession(), settings.API_ID, settings.API_HASH, proxy=proxy) as client:
+    with TelegramClient(StringSession(), settings.API_ID, settings.API_HASH, proxy=proxy.as_dict()) as client:
         print(client.session.save())
 
 
