@@ -53,6 +53,14 @@ def split_by_chunks(iterable, chunks_count):
         yield iterable[i:i + chunk_size]
 
 
+def set_completed(username: str, accounts):
+    for account in accounts:
+        if account.username == username:
+            account.completed = True
+            return True
+    return False
+
+
 def send_reports_to_main_account(sub_accounts):
     result = []
     for sub_account in sub_accounts:
@@ -68,38 +76,44 @@ def send_reports_to_main_account(sub_accounts):
                 f'send_to_username: {sub_account.send_to_username}\n'
                 f'image_path: {sub_account.image_path}\n'
                 f'link: {sub_account.link}\n'
-                f'proxy: {sub_account._proxy.as_dict()}\n'
+                f'proxy: {sub_account._proxy._as_dict()}\n'
                 f'completed: {sub_account.completed}'
             )
             print(f'[{sub_account.username}]{traceback.format_exc()}')
-            result.append(str(e))
+            result.append(f'[{sub_account.username}]' + str(e))
         except asyncio.exceptions.CancelledError:
             pass
     return result
 
 
-def send_reports_to_chat_bot(main_accounts):
+def send_reports_to_chat_bot(main_accounts, retries=settings.FULL_DIALOG_RETRIES_COUNT):
     errors = []
+    default_retries = retries
     for main_acc in main_accounts:
-        try:
-            asyncio.run(main_acc.send_reports_to_chat_bot())
-        except Exception as e:
-            print(f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.')
-            print(
-                f'[{main_acc.username}]\n'
-                f'username: {main_acc.username}\n'
-                f'is_main: {main_acc.is_main}\n'
-                f'session: {main_acc.session}\n'
-                f'send_to_username: {main_acc.send_to_username}\n'
-                f'image_path: {main_acc.image_path}\n'
-                f'link: {main_acc.link}\n'
-                f'proxy: {main_acc._proxy.as_dict()}\n'
-                f'completed: {main_acc.completed}'
-            )
-            print(f'[{main_acc.username}]{traceback.format_exc()}')
-            errors.append(str(e))
-        except asyncio.exceptions.CancelledError:
-            pass
+        remaining_retries = default_retries
+        while remaining_retries > 0:
+            remaining_retries -= 1
+            try:
+                result = asyncio.run(main_acc.send_reports_to_chat_bot())
+                if result:
+                    errors.extend(result)
+            except Exception as e:
+                print(f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.')
+                print(
+                    f'[{main_acc.username}]\n'
+                    f'username: {main_acc.username}\n'
+                    f'is_main: {main_acc.is_main}\n'
+                    f'session: {main_acc.session}\n'
+                    f'send_to_username: {main_acc.send_to_username}\n'
+                    f'image_path: {main_acc.image_path}\n'
+                    f'link: {main_acc.link}\n'
+                    f'proxy: {main_acc._proxy._as_dict()}\n'
+                    f'completed: {main_acc.completed}'
+                )
+                print(f'[{main_acc.username}]{traceback.format_exc()}')
+                errors.append(f'[{main_acc.username}]' + str(e))
+            except asyncio.exceptions.CancelledError:
+                pass
     return errors
 
 

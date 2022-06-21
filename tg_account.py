@@ -14,21 +14,29 @@ from utils import safe_get_response, click_button_if_any, get_time_to_sleep
 
 
 class AbstractTelegramAccount:
-    def __init__(self, parser_row, proxy: mobile_proxy.MobileProxy):
-        self.username = parser_row['username']
-        self.is_main = parser_row['is_main'] == 'TRUE'
-        self.session = StringSession(parser_row['hash'])
-        self.send_to_username = parser_row['send_to']
-        self.image_path = parser_row['image_path']
-        self.link = parser_row['link']
-        self._proxy = proxy
-        self.completed = False
+    def __init__(self, parser_row: dict, proxy: mobile_proxy.MobileProxy):
+        try:
+            self.session = StringSession(parser_row['hash'])
+            self.username = parser_row['username']
+            self.is_main = parser_row['is_main'] == 'TRUE'
+            self.send_to_username = parser_row['send_to']
+            self.image_path = parser_row['image_path']
+            self.link = parser_row['link']
+            self._proxy = proxy
+            self.completed = False
+        except Exception as e:
+            print(f'Ошибка во входных данных для аккаунта {parser_row.get("username", "Неизвестен")}')
+            exit(1)
+        print(f'Данные для {self.username} введены корректно')
 
     @property
     def client(self):
-        x = self._proxy.as_dict()
-        print(x)
-        return TelegramClient(self.session, settings.API_ID, settings.API_HASH, proxy=x)
+        try:
+            return TelegramClient(
+                self.session, settings.API_ID, settings.API_HASH, proxy=self._proxy.as_dict(self.username)
+            ).start('0')
+        except telethon.errors.rpcerrorlist.PhoneNumberInvalidError:
+            raise ValueError(f'[{self.username}]Не удалось войти в аккаунт')
 
 
 class B0TelegramAccount(AbstractTelegramAccount):
@@ -86,22 +94,12 @@ class B1TelegramAccount(AbstractTelegramAccount):
             )
         )
 
-    async def send_reports_to_chat_bot(self, retries=settings.FULL_DIALOG_RETRIES_COUNT):
+    async def send_reports_to_chat_bot(self):
         if not self.is_main:
             raise RuntimeError(
                 f'[{self.username}]Не вышло отправить отчеты чат боту: аккаунт `{self.username}` не главный.'
             )
-        error = ''
-        while retries > 0:
-            retries -= 1
-            try:
-                await self._send_reports_to_chat_bot(self.completed_sub_accounts_usernames)
-                return
-            except Exception as e:
-                error = f'[{self.username}]Непредвиденная ошибка: {e}'
-                print(error)
-                print(f'[{self.username}]{traceback.format_exc()}')
-        raise ValueError(error)
+        return await self._send_reports_to_chat_bot(self.completed_sub_accounts_usernames)
 
     async def _start_dialog(self, conv: Conversation):
         await conv.send_message('/start')
@@ -163,9 +161,49 @@ class B1TelegramAccount(AbstractTelegramAccount):
                         f'кнопки: {list(map(lambda btn: btn.text, buttons))}'
                     )
 
+    async def _send_report_of_b0(self, client, conv, dialog, image, link):
+        await self._start_dialog(conv)
+        await self._select_task(conv, client)
+        should_send_link = bool(self.link)
+
+        report_saved = False
+        bot_message = await safe_get_response(conv, self.username)
+        clicked = await click_button_if_any(bot_message, 'За команду')
+        while not clicked:
+            bot_message = await safe_get_response(conv, self.username)
+            clicked = await click_button_if_any(bot_message, 'За команду')
+
+        while not report_saved:
+            bot_message = await safe_get_response(conv, self.username)
+            if bot_message.text == 'Отправьте изображение выполненной задачи':
+                time.sleep(get_time_to_sleep())
+                await client.forward_messages(dialog, image)
+            elif bot_message.text == 'Отправьте ссылки':
+                if should_send_link:
+                    time.sleep(get_time_to_sleep())
+                    await client.forward_messages(dialog, link)
+                else:
+                    raise RuntimeError(f'[{self.username}]Бот просит ссылку, но у нас её нет')
+            elif bot_message.text == 'Перейти к следующему шагу:':
+                await click_button_if_any(bot_message, 'К следующему шагу')
+                await click_button_if_any(bot_message, 'Сохранить отчет')
+            else:
+                clicked = await click_button_if_any(bot_message, 'Сохранить отчет')
+                if clicked or bot_message.text == 'Отчет к задаче сохранен':
+                    report_saved = True
+                    print(f'[{self.username}]Отчет за члена команды сохранен')
+                else:
+                    buttons = bot_message.buttons or []
+                    raise RuntimeError(
+                        f'[{self.username}]Непредвиденный ответ от бота, '
+                        f'сообщение "{bot_message.text}", '
+                        f'кнопки: {list(map(lambda btn: btn.text, buttons))}'
+                    )
+
     async def _send_reports_to_chat_bot(self, sub_accounts_usernames):
         print(f'[{self.username}]{self.username} начал отправку отчетов чат боту.')
         should_send_link = bool(self.link)
+        errors = []
 
         async with self.client as client:
             dialog = await self.chat_bot.get_dialog(client, self.username)
@@ -180,43 +218,12 @@ class B1TelegramAccount(AbstractTelegramAccount):
                 members_left = len(sub_accounts_usernames)
                 while members_left > 0:
                     members_left -= 1
-                    await self._start_dialog(conv)
-                    await self._select_task(conv, client)
-                    if should_send_link:
-                        link = next(messages_to_forward)
-                    image = next(messages_to_forward)
-
-                    report_saved = False
-                    bot_message = await safe_get_response(conv, self.username)
-                    clicked = await click_button_if_any(bot_message, 'За команду')
-                    while not clicked:
-                        bot_message = await safe_get_response(conv, self.username)
-                        clicked = await click_button_if_any(bot_message, 'За команду')
-
-                    while not report_saved:
-                        bot_message = await safe_get_response(conv, self.username)
-                        if bot_message.text == 'Отправьте изображение выполненной задачи':
-                            time.sleep(get_time_to_sleep())
-                            await client.forward_messages(dialog, image)
-                        elif bot_message.text == 'Отправьте ссылки':
-                            if should_send_link:
-                                time.sleep(get_time_to_sleep())
-                                await client.forward_messages(dialog, link)
-                            else:
-                                raise RuntimeError(f'[{self.username}]Бот просит ссылку, но у нас её нет')
-                        elif bot_message.text == 'Перейти к следующему шагу:':
-                            await click_button_if_any(bot_message, 'К следующему шагу')
-                            await click_button_if_any(bot_message, 'Сохранить отчет')
-                        else:
-                            clicked = await click_button_if_any(bot_message, 'Сохранить отчет')
-                            if clicked or bot_message.text == 'Отчет к задаче сохранен':
-                                report_saved = True
-                                print(f'[{self.username}]Отчет за члена команды сохранен')
-                            else:
-                                buttons = bot_message.buttons or []
-                                raise RuntimeError(
-                                    f'[{self.username}]Непредвиденный ответ от бота, '
-                                    f'сообщение "{bot_message.text}", '
-                                    f'кнопки: {list(map(lambda btn: btn.text, buttons))}'
-                                )
+                    link = None
+                    try:
+                        if should_send_link:
+                            link = next(messages_to_forward)
+                        image = next(messages_to_forward)
+                        await self._send_report_of_b0(client, conv, dialog, image, link)
+                    except Exception as e:
+                        errors.append(f'[{self.username}]Не удалось отправить отчет за команду:{str(e)}')
                 conv.cancel()

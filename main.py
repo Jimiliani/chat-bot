@@ -7,7 +7,7 @@ from accounts_parser import AccountsParser
 from tg_account import B0TelegramAccount, B1TelegramAccount
 
 import settings
-from utils import split_by_chunks, send_reports_to_main_account, send_reports_to_chat_bot
+from utils import split_by_chunks, send_reports_to_main_account, send_reports_to_chat_bot, set_completed
 
 
 async def main():
@@ -40,12 +40,12 @@ async def main():
     chunks_with_sub_accounts = list(split_by_chunks(sub_accounts, settings.PROCESS_COUNT))
     with Pool(settings.PROCESS_COUNT) as p:
         result.extend(p.map(send_reports_to_main_account, chunks_with_sub_accounts))
-    for orig_list, new_list in zip(chunks_with_sub_accounts, result):
-        for orig, new in zip(orig_list, new_list):
-            if getattr(new, 'completed', False):
-                orig.completed = True
-            else:
-                errors.append(new)
+
+    for usernames_list in result:
+        for username in usernames_list:
+            is_username = set_completed(username, sub_accounts)
+            if not is_username:
+                errors.append(username)
 
     errors_lists = [errors]
     chunks_with_main_accounts = split_by_chunks(main_accounts, settings.PROCESS_COUNT)
