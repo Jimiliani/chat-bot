@@ -31,6 +31,7 @@ async def safe_get_response(conv: Conversation, username, retry=settings.MESSAGE
         retry -= 1
         try:
             msg = await conv.get_response(timeout=settings.CHAT_BOT_MESSAGES_TIMEOUT)
+            print(f'[{username}]Сообщение от бота: {msg.text}')
             if await is_empty(msg):
                 print(f'[{username}]Предупреждение: получено сообщение от бота без текста и кнопок.')
                 empty_messages_in_a_row += 1
@@ -86,7 +87,7 @@ def send_reports_to_main_account(sub_accounts):
     return result
 
 
-def send_reports_to_chat_bot(main_accounts, retries=settings.FULL_DIALOG_RETRIES_COUNT):
+def send_reports_to_chat_bot(main_accounts, task_name, retries=settings.FULL_DIALOG_RETRIES_COUNT):
     errors = []
     default_retries = retries
     for main_acc in main_accounts:
@@ -94,7 +95,7 @@ def send_reports_to_chat_bot(main_accounts, retries=settings.FULL_DIALOG_RETRIES
         while remaining_retries > 0:
             remaining_retries -= 1
             try:
-                result = asyncio.run(main_acc.send_reports_to_chat_bot())
+                result = asyncio.run(main_acc.send_reports_to_chat_bot(task_name))
                 if result:
                     errors.extend(result)
             except Exception as e:

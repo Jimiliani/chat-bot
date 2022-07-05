@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import functools
 from multiprocessing import Pool
 
 import utils
@@ -12,7 +13,7 @@ from utils import split_by_chunks, send_reports_to_main_account, send_reports_to
 
 async def main():
     print('Введите название задачи(или его часть):')
-    settings.TASK_NAME = str(input())
+    task_name = str(input())
     print(datetime.datetime.now())
     parser = AccountsParser(
         settings.ACCOUNTS_FILENAME,
@@ -25,11 +26,9 @@ async def main():
     proxies = utils.get_proxies()
     for acc_data in parser.main_accounts:
         counter += 1
-        print(acc_data)
         current_acc_sub_accounts = []
         for sub_account_data in parser.sub_accounts_by_main_acc(acc_data):
             counter += 1
-            print(sub_account_data)
             sub_account = B0TelegramAccount(sub_account_data, proxies[counter % len(proxies)])
             current_acc_sub_accounts.append(sub_account)
             sub_accounts.append(sub_account)
@@ -50,8 +49,16 @@ async def main():
     errors_lists = [errors]
     chunks_with_main_accounts = split_by_chunks(main_accounts, settings.PROCESS_COUNT)
     with Pool(settings.PROCESS_COUNT) as p:
-        errors_lists.extend(p.map(send_reports_to_chat_bot, chunks_with_main_accounts))
-
+        errors_lists.extend(
+            p.map(
+                functools.partial(
+                    send_reports_to_chat_bot,
+                    task_name=task_name
+                ),
+                chunks_with_main_accounts
+            )
+        )
+    print('Отчеты отправлены, ошибки возникшие в ходе работы программы:')
     for error in [error for errors_list in errors_lists for error in errors_list]:
         print(error)
     print(datetime.datetime.now())

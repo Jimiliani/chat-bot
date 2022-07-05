@@ -32,9 +32,13 @@ class AbstractTelegramAccount:
     @property
     def client(self):
         try:
+            proxy = self._proxy.as_dict(self.username)
+            _ = TelegramClient(
+                self.session, settings.API_ID, settings.API_HASH, proxy=proxy
+            ).start('0')  # нам надо проверить, что в акк вообще можно войти
             return TelegramClient(
-                self.session, settings.API_ID, settings.API_HASH, proxy=self._proxy.as_dict(self.username)
-            ).start('0')
+                self.session, settings.API_ID, settings.API_HASH, proxy=proxy
+            )
         except telethon.errors.rpcerrorlist.PhoneNumberInvalidError:
             raise ValueError(f'[{self.username}]Не удалось войти в аккаунт')
 
@@ -56,7 +60,7 @@ class B0TelegramAccount(AbstractTelegramAccount):
                 await client.send_file(entity, file)
         self.completed = True
         print(f'[{self.username}]Отчет от {self.username} к {self.send_to_username} отправлен успешно.')
-        return self
+        return self.username
 
 
 class B1TelegramAccount(AbstractTelegramAccount):
@@ -94,12 +98,12 @@ class B1TelegramAccount(AbstractTelegramAccount):
             )
         )
 
-    async def send_reports_to_chat_bot(self):
+    async def send_reports_to_chat_bot(self, task_name):
         if not self.is_main:
             raise RuntimeError(
                 f'[{self.username}]Не вышло отправить отчеты чат боту: аккаунт `{self.username}` не главный.'
             )
-        return await self._send_reports_to_chat_bot(self.completed_sub_accounts_usernames)
+        return await self._send_reports_to_chat_bot(self.completed_sub_accounts_usernames, task_name)
 
     async def _start_dialog(self, conv: Conversation):
         await conv.send_message('/start')
@@ -110,7 +114,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
                 f'Ожидалось: \"{"Привет! Выберите действие из меню!"}\"'
             )
 
-    async def _select_task(self, conv: Conversation, client):
+    async def _select_task(self, conv: Conversation, client, task_name):
         time.sleep(get_time_to_sleep())
         await conv.send_message('Активные задачи')
         bot_message = await safe_get_response(conv, self.username)
@@ -119,9 +123,9 @@ class B1TelegramAccount(AbstractTelegramAccount):
 
         buttons_texts = await self.chat_bot.get_buttons_texts(client, self.username)
         try:
-            task_text = next(filter(lambda text: settings.TASK_NAME in text, buttons_texts.split('\n')))
+            task_text = next(filter(lambda text: task_name in text, buttons_texts.split('\n')))
         except StopIteration:
-            raise RuntimeError(f'[{self.username}]Нет задачи с текстом {settings.TASK_NAME}.')
+            raise RuntimeError(f'[{self.username}]Нет задачи с текстом {task_name}.')
         await bot_message.click(text=task_text)
 
     async def _send_my_report(self, conv):
@@ -172,7 +176,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
         while not clicked:
             bot_message = await safe_get_response(conv, self.username)
             clicked = await click_button_if_any(bot_message, 'За команду')
-
+        retries = 3
         while not report_saved:
             bot_message = await safe_get_response(conv, self.username)
             if bot_message.text == 'Отправьте изображение выполненной задачи':
@@ -187,6 +191,10 @@ class B1TelegramAccount(AbstractTelegramAccount):
             elif bot_message.text == 'Перейти к следующему шагу:':
                 await click_button_if_any(bot_message, 'К следующему шагу')
                 await click_button_if_any(bot_message, 'Сохранить отчет')
+            elif 'Исполнитель достиг лимита отчетов к задаче' in bot_message.text and retries > 0:
+                retries -= 1
+                print(f'[{self.username}]Предупреждение: исполнитель достиг лимита отчетов к задаче')
+                continue
             else:
                 clicked = await click_button_if_any(bot_message, 'Сохранить отчет')
                 if clicked or bot_message.text == 'Отчет к задаче сохранен':
@@ -194,13 +202,14 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     print(f'[{self.username}]Отчет за члена команды сохранен')
                 else:
                     buttons = bot_message.buttons or []
+                    print(f'[{self.username}]Ошибка: отчет за члена команды не сохранен')
                     raise RuntimeError(
                         f'[{self.username}]Непредвиденный ответ от бота, '
                         f'сообщение "{bot_message.text}", '
                         f'кнопки: {list(map(lambda btn: btn.text, buttons))}'
                     )
 
-    async def _send_reports_to_chat_bot(self, sub_accounts_usernames):
+    async def _send_reports_to_chat_bot(self, sub_accounts_usernames, task_name):
         print(f'[{self.username}]{self.username} начал отправку отчетов чат боту.')
         should_send_link = bool(self.link)
         errors = []
@@ -212,7 +221,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
             ))
             async with client.conversation(dialog) as conv:
                 await self._start_dialog(conv)
-                await self._select_task(conv, client)
+                await self._select_task(conv, client, task_name)
                 await self._send_my_report(conv)
 
                 members_left = len(sub_accounts_usernames)
@@ -225,5 +234,8 @@ class B1TelegramAccount(AbstractTelegramAccount):
                         image = next(messages_to_forward)
                         await self._send_report_of_b0(client, conv, dialog, image, link)
                     except Exception as e:
-                        errors.append(f'[{self.username}]Не удалось отправить отчет за команду:{str(e)}')
+                        errors.append(f'[{self.username}]Не удалось отправить отчет за команду: {str(e)}')
+                        print(f'[{self.username}]{traceback.format_exc()}')
                 conv.cancel()
+        print(f'[{self.username}]Ошибки: {errors}')
+        return errors

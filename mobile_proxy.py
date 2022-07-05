@@ -14,8 +14,8 @@ class MobileProxy:
         self._key = key
         self._token = token
 
-        self.ip = self.get_ip()
         self.username = None
+        self.ip = self.get_ip()
         self.host = host
         self.port = port
         self._used_ips = {}
@@ -50,6 +50,7 @@ class MobileProxy:
         self._used_ips[self.ip] = datetime.datetime.now()
 
     def _send_request(self, method: str):
+        print(f'[{self.username}][{self._id}]{method.format(proxy_id=self._id, proxy_key=self._key)}')
         response = requests.get(
             method.format(proxy_id=self._id, proxy_key=self._key),
             headers={
@@ -64,15 +65,17 @@ class MobileProxy:
         while True:
             print(f'[{self.username}][{self._id}]Получаем новое оборудование')
             response = self._send_request(settings.ProxyMethods.CHANGE_EQUIPMENT)
-            if 'message' in response.json()['status']:
+            if response.json().get('status', '').lower() == 'ok':
                 self._update_used_ip()
                 self.ip = self.get_ip()
+                break
             else:
-                print(f'[{self.username}][{self._id}]С прошлой смены оборудования прошло меньше 10 минут, ждем 1 минуту')
-                time.sleep(60)
+                print(f'[{self.username}][{self._id}]С прошлой смены оборудования прошло меньше 10 минут, пробуем снова сменить IP, вдруг отлагает.')
+                self.change_ip()
+                break
 
     def change_ip(self):
-        retries = 3
+        retries = 1
         while True:
             print(f'[{self.username}][{self._id}]Получаем новый IP')
             response = self._send_request(settings.ProxyMethods.CHANGE_IP)
@@ -84,7 +87,7 @@ class MobileProxy:
                 print(f'[{self.username}][{self._id}]Новый IP - {new_ip}')
                 self.ip = new_ip
                 break
-            elif retries == 0:
+            elif retries <= 0:
                 self.change_equipment()
                 break
             else:
