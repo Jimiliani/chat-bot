@@ -4,6 +4,8 @@ from enum import Enum
 API_ID = 10690614
 API_HASH = '0b44105f7cb2843d07e94535b9c13823'
 
+CHAT_BOT_TG_ID = 1808403369
+
 BASE_URL = 'https://mobileproxy.space/'
 
 
@@ -19,7 +21,7 @@ LINKS_FILENAME = 'links.csv'
 IMAGES_DIRECTORY_NAME = 'images'
 ALLOWED_IMAGES_EXTENSIONS = ['jpg', 'jpeg', 'png', 'PNG', 'JPG', 'JPEG']
 
-CHAT_BOT_MESSAGES_TIMEOUT = 180
+CHAT_BOT_MESSAGES_TIMEOUT = 15
 
 
 PROXY_TYPE = 'socks5'

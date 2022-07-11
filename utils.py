@@ -15,12 +15,16 @@ import settings
 class EmptyResponse:
     text = None
 
-    def click(self, *args, **kwargs):
+    async def click(self, *args, **kwargs):
         return None
 
 
 async def is_empty(msg):
     return not getattr(msg, 'text', None) and not getattr(msg, 'buttons', None)
+
+
+async def is_error(msg):
+    return 'Возникла непредвиденная ошибка!' in getattr(msg, 'text', '')
 
 
 async def safe_get_response(conv: Conversation, username, retry=settings.MESSAGE_RETRIES_COUNT):
@@ -35,9 +39,11 @@ async def safe_get_response(conv: Conversation, username, retry=settings.MESSAGE
             if await is_empty(msg):
                 print(f'[{username}]Предупреждение: получено сообщение от бота без текста и кнопок.')
                 empty_messages_in_a_row += 1
-                retry += 1
-                continue
-            return msg
+            elif await is_error(msg):
+                print(f'[{username}]Предупреждение: бот говорит, что он сломался.')
+            else:
+                return msg
+            retry += 1
         except (asyncio.exceptions.CancelledError, asyncio.exceptions.TimeoutError):
             pass
     return EmptyResponse()

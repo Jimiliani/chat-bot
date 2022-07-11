@@ -42,8 +42,8 @@ async def main():
 
     for usernames_list in result:
         for username in usernames_list:
-            is_username = set_completed(username, sub_accounts)
-            if not is_username:
+            completed = set_completed(username, sub_accounts)
+            if not completed:
                 errors.append(username)
 
     errors_lists = [errors]

@@ -110,7 +110,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
         bot_message = await safe_get_response(conv, self.username)
         if bot_message.text != 'Привет! Выберите действие из меню!':
             raise RuntimeError(
-                f'[{self.username}]Неожиданные ответ от чат бота: "{bot_message.text}". '
+                f'[{self.username}]Неожиданный ответ от чат бота: "{bot_message.text}". '
                 f'Ожидалось: \"{"Привет! Выберите действие из меню!"}\"'
             )
 
@@ -158,16 +158,16 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     report_saved = True
                     print(f'[{self.username}]Отчет за {self.username} сохранен')
                 else:
-                    buttons = bot_message.buttons or []
+                    buttons_matrix = bot_message.buttons or [[]]
                     raise RuntimeError(
                         f'[{self.username}]Непредвиденный ответ от бота, '
                         f'сообщение "{bot_message.text}", '
-                        f'кнопки: {list(map(lambda btn: btn.text, buttons))}'
+                        f'кнопки: {list(map(lambda buttons: list(map(lambda btn: btn.text, buttons)), buttons_matrix))}'
                     )
 
-    async def _send_report_of_b0(self, client, conv, dialog, image, link):
+    async def _send_report_of_b0(self, client, conv, dialog, image, link, task_name):
         await self._start_dialog(conv)
-        await self._select_task(conv, client)
+        await self._select_task(conv, client, task_name)
         should_send_link = bool(self.link)
 
         report_saved = False
@@ -232,7 +232,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
                         if should_send_link:
                             link = next(messages_to_forward)
                         image = next(messages_to_forward)
-                        await self._send_report_of_b0(client, conv, dialog, image, link)
+                        await self._send_report_of_b0(client, conv, dialog, image, link, task_name)
                     except Exception as e:
                         errors.append(f'[{self.username}]Не удалось отправить отчет за команду: {str(e)}')
                         print(f'[{self.username}]{traceback.format_exc()}')

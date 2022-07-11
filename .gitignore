@@ -9,3 +9,6 @@ accounts.csv
 accounts2.csv
 links.csv
 images
+images/*
+tmp
+tmp/*
