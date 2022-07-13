@@ -13,7 +13,7 @@ import settings
 
 
 class EmptyResponse:
-    text = None
+    text = ''
 
     async def click(self, *args, **kwargs):
         return None
@@ -35,12 +35,12 @@ async def safe_get_response(conv: Conversation, username, retry=settings.MESSAGE
         retry -= 1
         try:
             msg = await conv.get_response(timeout=settings.CHAT_BOT_MESSAGES_TIMEOUT)
-            print(f'[{username}]Сообщение от бота: {msg.text}')
+            settings.logging.info(f'[{username}]Сообщение от бота: {msg.text}')
             if await is_empty(msg):
-                print(f'[{username}]Предупреждение: получено сообщение от бота без текста и кнопок.')
+                settings.logging.warning(f'[{username}]Предупреждение: получено сообщение от бота без текста и кнопок.')
                 empty_messages_in_a_row += 1
             elif await is_error(msg):
-                print(f'[{username}]Предупреждение: бот говорит, что он сломался.')
+                settings.logging.warning(f'[{username}]Предупреждение: бот говорит, что он сломался.')
             else:
                 return msg
             retry += 1
@@ -74,8 +74,12 @@ def send_reports_to_main_account(sub_accounts):
         try:
             result.append(asyncio.run(sub_account.send_report_to_main_account()))
         except Exception as e:
-            print(f'[{sub_account.username}]Не удалось отправить отчет для аккаунта {sub_account.username}.')
-            print(
+            settings.logging.error(
+                f'[{sub_account.username}]Не удалось отправить отчет для аккаунта {sub_account.username}.'
+                f'image_path: {sub_account.image_path}\n'
+                f'link: {sub_account.link}\n'
+            )
+            settings.logging.error(
                 f'[{sub_account.username}]\n'
                 f'username: {sub_account.username}\n'
                 f'is_main: {sub_account.is_main}\n'
@@ -86,14 +90,14 @@ def send_reports_to_main_account(sub_accounts):
                 f'proxy: {sub_account._proxy._as_dict()}\n'
                 f'completed: {sub_account.completed}'
             )
-            print(f'[{sub_account.username}]{traceback.format_exc()}')
+            settings.logging.error(f'[{sub_account.username}]{traceback.format_exc()}')
             result.append(f'[{sub_account.username}]' + str(e))
         except asyncio.exceptions.CancelledError:
             pass
     return result
 
 
-def send_reports_to_chat_bot(main_accounts, task_name, retries=settings.FULL_DIALOG_RETRIES_COUNT):
+def send_reports_to_chat_bot(main_accounts, task_name, send_for, retries=settings.FULL_DIALOG_RETRIES_COUNT):
     errors = []
     default_retries = retries
     for main_acc in main_accounts:
@@ -101,12 +105,16 @@ def send_reports_to_chat_bot(main_accounts, task_name, retries=settings.FULL_DIA
         while remaining_retries > 0:
             remaining_retries -= 1
             try:
-                result = asyncio.run(main_acc.send_reports_to_chat_bot(task_name))
+                result = asyncio.run(main_acc.send_reports_to_chat_bot(task_name, send_for))
                 if result:
                     errors.extend(result)
             except Exception as e:
-                print(f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.')
-                print(
+                settings.logging.error(
+                    f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.'
+                    f'image_path: {main_acc.image_path}\n'
+                    f'link: {main_acc.link}\n'
+                )
+                settings.logging.error(
                     f'[{main_acc.username}]\n'
                     f'username: {main_acc.username}\n'
                     f'is_main: {main_acc.is_main}\n'
@@ -117,7 +125,7 @@ def send_reports_to_chat_bot(main_accounts, task_name, retries=settings.FULL_DIA
                     f'proxy: {main_acc._proxy._as_dict()}\n'
                     f'completed: {main_acc.completed}'
                 )
-                print(f'[{main_acc.username}]{traceback.format_exc()}')
+                settings.logging.error(f'[{main_acc.username}]{traceback.format_exc()}')
                 errors.append(f'[{main_acc.username}]' + str(e))
             except asyncio.exceptions.CancelledError:
                 pass

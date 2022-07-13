@@ -1,5 +1,4 @@
 import datetime
-import time
 
 import requests
 
@@ -34,15 +33,15 @@ class MobileProxy:
 
     def as_dict(self, username=None):
         self.username = str(username)
-        print(f'[{self.username}][{self._id}]Пытаемся использовать прокси')
+        settings.logging.info(f'[{self.username}][{self._id}]Пытаемся использовать прокси')
         while self._used_ips.get(self.ip, datetime.datetime.min) + datetime.timedelta(minutes=10) > datetime.datetime.now():
             seconds = (datetime.datetime.now() - self._used_ips[self.ip]).seconds
-            print(f'[{self.username}][{self._id}]IP {self.ip} был использован {seconds // 60} минут {seconds % 60} секунд назад')
-            print(self._used_ips.get(self.ip, datetime.datetime.min))
-            print(datetime.datetime.now())
+            settings.logging.info(f'[{self.username}][{self._id}]IP {self.ip} был использован {seconds // 60} минут {seconds % 60} секунд назад')
+            settings.logging.info(self._used_ips.get(self.ip, datetime.datetime.min))
+            settings.logging.info(datetime.datetime.now())
             self.change_ip()
         self._update_used_ip()
-        print(f'[{self.username}][{self._id}]Используем прокси с IP {self.ip}')
+        settings.logging.info(f'[{self.username}][{self._id}]Используем прокси с IP {self.ip}')
         self.username = None
         return self._as_dict()
 
@@ -50,57 +49,58 @@ class MobileProxy:
         self._used_ips[self.ip] = datetime.datetime.now()
 
     def _send_request(self, method: str):
-        print(f'[{self.username}][{self._id}]{method.format(proxy_id=self._id, proxy_key=self._key)}')
+        settings.logging.info(f'[{self.username}][{self._id}]{method.format(proxy_id=self._id, proxy_key=self._key)}')
         response = requests.get(
             method.format(proxy_id=self._id, proxy_key=self._key),
             headers={
                 'Authorization': f'Bearer {self._token}',
                 'User-Agent': self.user_agent,
             },
+            timeout=settings.PROXY_REQUEST_TIMEOUT,
         )
-        print(f'[{self.username}][{self._id}]{response.json()}')
+        settings.logging.info(f'[{self.username}][{self._id}]{response.json()}')
         return response
 
     def change_equipment(self):
         while True:
-            print(f'[{self.username}][{self._id}]Получаем новое оборудование')
+            settings.logging.info(f'[{self.username}][{self._id}]Получаем новое оборудование')
             response = self._send_request(settings.ProxyMethods.CHANGE_EQUIPMENT)
             if response.json().get('status', '').lower() == 'ok':
                 self._update_used_ip()
                 self.ip = self.get_ip()
                 break
             else:
-                print(f'[{self.username}][{self._id}]С прошлой смены оборудования прошло меньше 10 минут, пробуем снова сменить IP, вдруг отлагает.')
+                settings.logging.info(f'[{self.username}][{self._id}]С прошлой смены оборудования прошло меньше 10 минут, пробуем снова сменить IP, вдруг отлагает.')
                 self.change_ip()
                 break
 
     def change_ip(self):
-        retries = 1
+        retries = settings.PROXY_CHANGE_IP_RETRIES
         while True:
-            print(f'[{self.username}][{self._id}]Получаем новый IP')
+            settings.logging.info(f'[{self.username}][{self._id}]Получаем новый IP')
             response = self._send_request(settings.ProxyMethods.CHANGE_IP)
             new_ip = response.json().get('new_ip', None)
             if new_ip is None:
-                print(f'[{self.username}][{self._id}]Плохой ответ, повторяем запрос')
+                settings.logging.info(f'[{self.username}][{self._id}]Плохой ответ, повторяем запрос')
                 continue
             if new_ip != self.ip:
-                print(f'[{self.username}][{self._id}]Новый IP - {new_ip}')
+                settings.logging.info(f'[{self.username}][{self._id}]Новый IP - {new_ip}')
                 self.ip = new_ip
                 break
-            elif retries <= 0:
+            elif retries < 0:
                 self.change_equipment()
                 break
             else:
                 retries -= 1
-            print(f'[{self.username}][{self._id}]Новый IP совпадает со старым, повторяем запрос')
+            settings.logging.info(f'[{self.username}][{self._id}]Новый IP совпадает со старым, повторяем запрос')
 
     def get_ip(self):
         while True:
-            print(f'[{self.username}][{self._id}]Получаем текущий IP')
+            settings.logging.info(f'[{self.username}][{self._id}]Получаем текущий IP')
             response = self._send_request(settings.ProxyMethods.GET_IP)
             if response.json().get('proxy_id') is not None:
                 ip = response.json()['proxy_id'].get(str(self._id))
                 if ip:
-                    print(f'[{self.username}][{self._id}]Текущий IP - {ip}')
+                    settings.logging.info(f'[{self.username}][{self._id}]Текущий IP - {ip}')
                     return ip
-            print(f'[{self.username}][{self._id}]Полученный IP - невалидный, повторяем запрос')
+            settings.logging.info(f'[{self.username}][{self._id}]Полученный IP - невалидный, повторяем запрос')

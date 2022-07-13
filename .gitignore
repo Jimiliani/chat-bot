@@ -12,3 +12,5 @@ images
 images/*
 tmp
 tmp/*
+logs
+logs/*

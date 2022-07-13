@@ -1,5 +1,5 @@
-import os
-from enum import Enum
+import datetime
+import logging
 
 API_ID = 10690614
 API_HASH = '0b44105f7cb2843d07e94535b9c13823'
@@ -17,20 +17,28 @@ class ProxyMethods:
 
 ACCOUNTS_FILENAME = 'accounts.csv'
 LINKS_FILENAME = 'links.csv'
-
 IMAGES_DIRECTORY_NAME = 'images'
 ALLOWED_IMAGES_EXTENSIONS = ['jpg', 'jpeg', 'png', 'PNG', 'JPG', 'JPEG']
 
-CHAT_BOT_MESSAGES_TIMEOUT = 15
+
+logging.basicConfig(
+    filename=f"logs/{datetime.datetime.now().strftime('%Y:%m:%d %H:%M:%S')}.log",
+    level=logging.DEBUG
+)
+
+
+CHAT_BOT_MESSAGES_TIMEOUT = 30
 
 
 PROXY_TYPE = 'socks5'
 PROXY_RDNS = True
 # (айди, хост, порт, логин, пароль, ключ, токен)
 MOBILE_PROXIES = [
-    (69599, 'bproxy.site', 10749, 'aN7aTn', 'Eh1EcdEEunYm', 'f9533792fc71360ca77b306e94162328', '364eee2ec2ca28fac8bead27c965b411'),
+    (93192, 'bproxy.site', 10427, 'tapseN', 'TaEgYF3YhUZU', 'afbedf14b7d655ce05fd567bdd531976', 'e9ae32efffa279374b80482be65c9f82'),
 ]
-ACCOUNTS_ON_PROXY = 57
+PROXY_CHANGE_IP_RETRIES = 1
+PROXY_REQUEST_TIMEOUT = 30
+ACCOUNTS_ON_PROXY = 10000
 
 PROCESS_COUNT = 1
 
