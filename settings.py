@@ -22,12 +22,12 @@ ALLOWED_IMAGES_EXTENSIONS = ['jpg', 'jpeg', 'png', 'PNG', 'JPG', 'JPEG']
 
 
 logging.basicConfig(
-    filename=f"logs/{datetime.datetime.now().strftime('%Y:%m:%d %H:%M:%S')}.log",
+    filename=f"logs/{datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')}.log",
     level=logging.DEBUG
 )
 
 
-CHAT_BOT_MESSAGES_TIMEOUT = 30
+CHAT_BOT_MESSAGES_TIMEOUT = 20
 
 
 PROXY_TYPE = 'socks5'
@@ -35,12 +35,16 @@ PROXY_RDNS = True
 # (айди, хост, порт, логин, пароль, ключ, токен)
 MOBILE_PROXIES = [
     (93192, 'bproxy.site', 10427, 'tapseN', 'TaEgYF3YhUZU', 'afbedf14b7d655ce05fd567bdd531976', 'e9ae32efffa279374b80482be65c9f82'),
+    (93260, 'bproxy.site', 11538, 'YhuS7A', 'eR9gaJYc9ceR', 'b5352f316c0c55ac71aa4414f90237ff', 'b86e7d5a0063bca071f58785bcde1a97'),
 ]
+PROCESS_COUNT = len(MOBILE_PROXIES)
 PROXY_CHANGE_IP_RETRIES = 1
 PROXY_REQUEST_TIMEOUT = 30
 ACCOUNTS_ON_PROXY = 10000
 
-PROCESS_COUNT = 1
 
 FULL_DIALOG_RETRIES_COUNT = 1
 MESSAGE_RETRIES_COUNT = 3
+
+B0_REPORT_TIMEOUT = 60
+B1_REPORT_TIMEOUT = 300

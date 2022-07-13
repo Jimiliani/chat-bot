@@ -14,6 +14,7 @@ import settings
 
 class EmptyResponse:
     text = ''
+    buttons = []
 
     async def click(self, *args, **kwargs):
         return None
@@ -53,11 +54,11 @@ async def click_button_if_any(msg, text: str) -> bool:
     return bool(await msg.click(text=text))
 
 
-def split_by_chunks(iterable, chunks_count):
-    chunk_size = len(iterable) // chunks_count + min(len(iterable) % chunks_count, 1)
-    chunk_size = max(chunk_size, 1)
-    for i in range(0, len(iterable), chunk_size):
-        yield iterable[i:i + chunk_size]
+def split_by_chunks(iterable, proxies):
+    chunks = list(map(lambda _: [], range(len(proxies))))
+    for instance in iterable:
+        chunks[proxies.index(instance._proxy)].append(instance)
+    return chunks
 
 
 def set_completed(username: str, accounts):
@@ -72,12 +73,19 @@ def send_reports_to_main_account(sub_accounts):
     result = []
     for sub_account in sub_accounts:
         try:
-            result.append(asyncio.run(sub_account.send_report_to_main_account()))
+            result.append(
+                asyncio.run(
+                    asyncio.wait_for(
+                        sub_account.send_report_to_main_account(),
+                        timeout=settings.B0_REPORT_TIMEOUT,
+                    ),
+                )
+            )
         except Exception as e:
             settings.logging.error(
-                f'[{sub_account.username}]Не удалось отправить отчет для аккаунта {sub_account.username}.'
-                f'image_path: {sub_account.image_path}\n'
-                f'link: {sub_account.link}\n'
+                f'[{sub_account.username}]Не удалось отправить отчет для аккаунта {sub_account.username}.\n'
+                f'фотка: {sub_account.image_path}\n'
+                f'ссылка: {sub_account.link}\n'
             )
             settings.logging.error(
                 f'[{sub_account.username}]\n'
@@ -105,14 +113,19 @@ def send_reports_to_chat_bot(main_accounts, task_name, send_for, retries=setting
         while remaining_retries > 0:
             remaining_retries -= 1
             try:
-                result = asyncio.run(main_acc.send_reports_to_chat_bot(task_name, send_for))
+                result = asyncio.run(
+                    asyncio.wait_for(
+                        main_acc.send_reports_to_chat_bot(task_name, send_for),
+                        timeout=settings.B1_REPORT_TIMEOUT,
+                    ),
+                )
                 if result:
                     errors.extend(result)
             except Exception as e:
                 settings.logging.error(
-                    f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.'
-                    f'image_path: {main_acc.image_path}\n'
-                    f'link: {main_acc.link}\n'
+                    f'[{main_acc.username}]Не удалось отправить отчет для аккаунта {main_acc.username}.\n'
+                    f'фотка: {main_acc.image_path}\n'
+                    f'ссылка: {main_acc.link}\n'
                 )
                 settings.logging.error(
                     f'[{main_acc.username}]\n'
@@ -149,3 +162,11 @@ def get_proxies() -> typing.List[mobile_proxy.MobileProxy]:
 
 def get_time_to_sleep():
     return round(random.uniform(1, 3), 2)
+
+
+def print_errors(errors: list):
+    for err in errors:
+        if isinstance(err, list):
+            print_errors(err)
+        elif err:
+            print(err)

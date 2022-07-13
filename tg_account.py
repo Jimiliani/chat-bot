@@ -30,12 +30,14 @@ class AbstractTelegramAccount:
         settings.logging.info(f'Данные для {self.username} введены корректно')
 
     @property
-    def client(self):
+    async def client(self):
         try:
             proxy = self._proxy.as_dict(self.username)
-            _ = TelegramClient(
+            settings.logging.info(f'[{self.username}]Пытаемся войти в аккаунт')
+            await TelegramClient(
                 self.session, settings.API_ID, settings.API_HASH, proxy=proxy
             ).start('0')  # нам надо проверить, что в акк вообще можно войти
+            settings.logging.info(f'[{self.username}]Успешно вошли в аккаунт')
             return TelegramClient(
                 self.session, settings.API_ID, settings.API_HASH, proxy=proxy
             )
@@ -51,7 +53,7 @@ class B0TelegramAccount(AbstractTelegramAccount):
                 f'[{self.username}]Не вышло отправить отчет главному аккаунту: аккаунт `{self.username}` '
                 f'и так главный, либо у него не указано поле `send_to`.'
             )
-        async with self.client as client:
+        async with await self.client as client:
             entity = await client.get_entity(self.send_to_username)
             if self.link:
                 time.sleep(get_time_to_sleep())
@@ -141,6 +143,10 @@ class B1TelegramAccount(AbstractTelegramAccount):
             bot_message = await safe_get_response(conv, self.username)
             clicked = await click_button_if_any(bot_message, 'Свой отчет')
 
+        if 'отчет принят' in bot_message.text and not clicked:
+            settings.logging.warning(f'[{self.username}]Предупреждение: отчет уже принят, ничего не отправляем')
+            return 'stop'
+
         while not report_saved:
             bot_message = await safe_get_response(conv, self.username)
             if bot_message.text == 'Отправьте изображение выполненной задачи':
@@ -169,7 +175,6 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     )
 
     async def _send_report_of_b0(self, client, conv, dialog, image, link, task_name):
-        await self._start_dialog(conv)
         await self._select_task(conv, client, task_name)
         should_send_link = bool(self.link)
 
@@ -204,7 +209,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     report_saved = True
                     settings.logging.info(f'[{self.username}]Отчет за члена команды сохранен')
                 else:
-                    buttons = bot_message.buttons or []
+                    buttons = bot_message.buttons
                     settings.logging.error(f'[{self.username}]Ошибка: отчет за члена команды не сохранен')
                     raise RuntimeError(
                         f'[{self.username}]Непредвиденный ответ от бота, '
@@ -217,16 +222,17 @@ class B1TelegramAccount(AbstractTelegramAccount):
         should_send_link = bool(self.link)
         errors = []
 
-        async with self.client as client:
+        async with await self.client as client:
             dialog = await self.chat_bot.get_dialog(client, self.username)
             messages_to_forward = iter(await self._get_messages_to_forward_to_chat_bot(
                 client, sub_accounts_usernames
             ))
             async with client.conversation(dialog) as conv:
                 if send_for.lower() == 'b1':
-                    await self._start_dialog(conv)
                     await self._select_task(conv, client, task_name)
-                    await self._send_my_report(conv)
+                    msg = await self._send_my_report(conv)
+                    if msg == 'stop':
+                        return
                 if send_for.lower() == 'b0':
                     members_left = len(sub_accounts_usernames)
                     while members_left > 0:
@@ -241,5 +247,8 @@ class B1TelegramAccount(AbstractTelegramAccount):
                             errors.append(f'[{self.username}]Не удалось отправить отчет за команду: {str(e)}')
                             settings.logging.error(f'[{self.username}]{traceback.format_exc()}')
                 conv.cancel()
-        settings.logging.error(f'[{self.username}]Ошибки: {errors}')
+        if errors:
+            settings.logging.error(f'[{self.username}]Ошибки: {errors}')
+        else:
+            settings.logging.info(f'[{self.username}]Ошибок при отправке не возникло')
         return errors
