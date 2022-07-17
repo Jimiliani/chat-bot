@@ -9,9 +9,6 @@ import mobile_proxy
 import settings
 
 
-# примерно половину этой хуйни можно перетащить в другие файлы и улучшить этим читаемость
-
-
 class EmptyResponse:
     text = ''
     buttons = []
@@ -63,7 +60,7 @@ def split_by_chunks(iterable, proxies):
 
 def set_completed(username: str, accounts):
     for account in accounts:
-        if account.username == username:
+        if account.username.lower() == username.lower():
             account.completed = True
             return True
     return False
@@ -74,11 +71,8 @@ def send_reports_to_main_account(sub_accounts):
     for sub_account in sub_accounts:
         try:
             result.append(
-                asyncio.run(
-                    asyncio.wait_for(
-                        sub_account.send_report_to_main_account(),
-                        timeout=settings.B0_REPORT_TIMEOUT,
-                    ),
+                asyncio.get_event_loop().run_until_complete(
+                    sub_account.send_report_to_main_account(),
                 )
             )
         except Exception as e:
@@ -113,11 +107,8 @@ def send_reports_to_chat_bot(main_accounts, task_name, send_for, retries=setting
         while remaining_retries > 0:
             remaining_retries -= 1
             try:
-                result = asyncio.run(
-                    asyncio.wait_for(
-                        main_acc.send_reports_to_chat_bot(task_name, send_for),
-                        timeout=settings.B1_REPORT_TIMEOUT,
-                    ),
+                result = asyncio.get_event_loop().run_until_complete(
+                    main_acc.send_reports_to_chat_bot(task_name, send_for),
                 )
                 if result:
                     errors.extend(result)
@@ -164,9 +155,11 @@ def get_time_to_sleep():
     return round(random.uniform(1, 3), 2)
 
 
-def print_errors(errors: list):
+def gather_errors(errors: list):
+    msg = ''
     for err in errors:
         if isinstance(err, list):
-            print_errors(err)
+            msg += gather_errors(err)
         elif err:
-            print(err)
+            msg += err + '\n'
+    return msg

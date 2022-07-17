@@ -177,6 +177,7 @@ class B1TelegramAccount(AbstractTelegramAccount):
     async def _send_report_of_b0(self, client, conv, dialog, image, link, task_name):
         await self._select_task(conv, client, task_name)
         should_send_link = bool(self.link)
+        sender = image.sender.username if image else 'неизвестный пользователь'
 
         report_saved = False
         bot_message = await safe_get_response(conv, self.username)
@@ -202,15 +203,15 @@ class B1TelegramAccount(AbstractTelegramAccount):
             elif 'Исполнитель достиг лимита отчетов к задаче' in bot_message.text and retries > 0:
                 retries -= 1
                 settings.logging.warning(f'[{self.username}]Предупреждение: исполнитель достиг лимита отчетов к задаче')
-                continue
+                return
             else:
                 clicked = await click_button_if_any(bot_message, 'Сохранить отчет')
                 if clicked or bot_message.text == 'Отчет к задаче сохранен':
                     report_saved = True
-                    settings.logging.info(f'[{self.username}]Отчет за члена команды сохранен')
+                    settings.logging.info(f'[{self.username}]Отчет за члена команды({sender}) сохранен')
                 else:
                     buttons = bot_message.buttons
-                    settings.logging.error(f'[{self.username}]Ошибка: отчет за члена команды не сохранен')
+                    settings.logging.error(f'[{self.username}]Ошибка: отчет за члена команды({sender}) не сохранен')
                     raise RuntimeError(
                         f'[{self.username}]Непредвиденный ответ от бота, '
                         f'сообщение "{bot_message.text}", '
@@ -234,18 +235,22 @@ class B1TelegramAccount(AbstractTelegramAccount):
                     if msg == 'stop':
                         return
                 if send_for.lower() == 'b0':
-                    members_left = len(sub_accounts_usernames)
-                    while members_left > 0:
-                        members_left -= 1
+                    while True:
                         link = None
+                        image = None
                         try:
                             if should_send_link:
                                 link = next(messages_to_forward)
                             image = next(messages_to_forward)
                             await self._send_report_of_b0(client, conv, dialog, image, link, task_name)
+                        except StopIteration as e:
+                            settings.logging.info(f'[{self.username}]Успешно отправили отчеты за команду за всех Б0: {sub_accounts_usernames}')
+                            break
                         except Exception as e:
-                            errors.append(f'[{self.username}]Не удалось отправить отчет за команду: {str(e)}')
+                            sender = image.sender.username if image else 'неизвестный пользователь'
+                            errors.append(f'[{self.username}]Не удалось отправить отчет за команду({sender}): {str(e)}')
                             settings.logging.error(f'[{self.username}]{traceback.format_exc()}')
+                            break
                 conv.cancel()
         if errors:
             settings.logging.error(f'[{self.username}]Ошибки: {errors}')

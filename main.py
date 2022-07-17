@@ -12,10 +12,10 @@ import settings
 from utils import split_by_chunks, send_reports_to_main_account, send_reports_to_chat_bot, set_completed
 
 
-async def main(skip_b0):
+def main(skip_b0):
     print('Введите название задачи(или его часть):')
     task_name = str(input())
-    print(f'Задача {task_name}')
+    print(f'Задача "{task_name}"')
     print(datetime.datetime.now())
     parser = AccountsParser(
         settings.ACCOUNTS_FILENAME,
@@ -60,7 +60,7 @@ async def main(skip_b0):
         )
     print('Б1 отправили отчеты за себя')
     print('Возникшие ошибки:')
-    print(utils.print_errors(errors_lists))
+    print(utils.gather_errors(errors_lists))
 
     if not skip_b0:
         print('Начинаем отправку от Б0 к Б1')
@@ -74,7 +74,7 @@ async def main(skip_b0):
                 errors.append(username)
     print('Б0 отправили отчеты к своим Б1, начинаем отправку от Б1 в чб за команду')
     print('Возникшие ошибки:')
-    print(utils.print_errors(errors))
+    print(utils.gather_errors(errors))
     errors_lists.append(errors)
 
     with Pool(settings.PROCESS_COUNT) as p:
@@ -92,11 +92,11 @@ async def main(skip_b0):
 
     settings.logging.info(
         f'Отчеты отправлены, ошибки возникшие в ходе работы программы:\n '
-        f'{utils.print_errors(errors_lists)}'
+        f'{utils.gather_errors(errors_lists)}'
     )
 
     print('Отчеты отправлены, ошибки возникшие в ходе работы программы:')
-    print(utils.print_errors(errors_lists))
+    print(utils.gather_errors(errors_lists))
     print(datetime.datetime.now())
 
 
@@ -105,5 +105,5 @@ if __name__ == '__main__':
     if '--skip-b0' in sys.argv:
         skip_b0 = True
     asyncio.set_event_loop(asyncio.SelectorEventLoop())
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main(skip_b0))
+    print(asyncio.get_event_loop())
+    main(skip_b0)

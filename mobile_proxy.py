@@ -57,6 +57,7 @@ class MobileProxy:
                 'User-Agent': self.user_agent,
             },
             timeout=settings.PROXY_REQUEST_TIMEOUT,
+            verify=False
         )
         settings.logging.info(f'[{self.username}][{self._id}]{response.json()}')
         return response
